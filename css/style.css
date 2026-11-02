@@ -1,4 +1,4 @@
-/* Clean Light Mode Styles for Badminton Mixed Doubles Score & Position Guide */
+/* Clean Light Mode & Fully Responsive Styles (Mobile, Tablet/iPad, Desktop) */
 
 :root {
   --court-green: #059669;
@@ -6,21 +6,32 @@
   --court-line: rgba(255, 255, 255, 0.95);
 }
 
-body {
+* {
+  box-sizing: border-box;
+}
+
+html, body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   background-color: #f8fafc;
   color: #0f172a;
+  overflow-x: hidden;
 }
 
 /* Badminton Court Container */
 .badminton-court {
   background: linear-gradient(135deg, #047857 0%, #059669 50%, #047857 100%);
-  border: 3px solid #ffffff;
-  box-shadow: 0 12px 24px -6px rgba(5, 150, 105, 0.3), inset 0 0 30px rgba(0, 0, 0, 0.12);
+  border: 2px solid #ffffff;
+  box-shadow: 0 10px 24px -6px rgba(5, 150, 105, 0.28), inset 0 0 28px rgba(0, 0, 0, 0.12);
   position: relative;
   overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .badminton-court {
+    border-width: 3px;
+  }
 }
 
 /* Net line in the center */
@@ -38,27 +49,27 @@ body {
 /* Active Server Box Highlight */
 .court-box-server {
   background: rgba(250, 204, 21, 0.22);
-  box-shadow: inset 0 0 0 2.5px rgba(250, 204, 21, 0.9);
+  box-shadow: inset 0 0 0 2px rgba(250, 204, 21, 0.95);
 }
 
 /* Active Receiver Box Highlight */
 .court-box-receiver {
   background: rgba(56, 189, 248, 0.2);
-  box-shadow: inset 0 0 0 2.5px rgba(56, 189, 248, 0.85);
+  box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.9);
 }
 
 /* Pulse animation for active server badge */
 @keyframes pulse-ring {
   0% {
-    transform: scale(0.97);
+    transform: scale(0.98);
     box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
   }
   70% {
     transform: scale(1);
-    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
   }
   100% {
-    transform: scale(0.97);
+    transform: scale(0.98);
     box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
   }
 }
@@ -78,10 +89,10 @@ body {
 
 @keyframes swap-bounce {
   0% {
-    transform: scale(0.88);
+    transform: scale(0.9);
   }
   50% {
-    transform: scale(1.06);
+    transform: scale(1.05);
   }
   100% {
     transform: scale(1);
@@ -96,8 +107,17 @@ body {
 }
 
 .service-arrow-line {
-  stroke-dasharray: 8, 6;
+  stroke-dasharray: 7, 5;
   animation: dash-flow 0.9s linear infinite;
+}
+
+/* Hide scrollbar for clean horizontal pills on mobile */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom Light Scrollbar */
