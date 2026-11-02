@@ -71,6 +71,7 @@ function badmintonApp() {
     // Tournament Bracket State
     bracket: {
       isCreated: false,
+      editMode: false, // Allows admin to manually change who vs who & reorder bracket matches
       title: 'Turnamen Badminton Ganda Campuran',
       size: 4, // 4, 8, 16, 32
       participantCount: 0,
@@ -502,6 +503,7 @@ function badmintonApp() {
 
       this.bracket = {
         isCreated: true,
+        editMode: false,
         title: this.bracket.title || 'Turnamen Badminton Ganda Campuran',
         size,
         participantCount: n,
@@ -510,12 +512,162 @@ function badmintonApp() {
         activeBracketMatchId: null
       };
 
-      // Auto-advance any BYE matches in Round 0
-      for (const match of this.bracket.rounds[0].matches) {
-        if (match.teamB && match.teamB.isBye && match.teamA) {
+      this.reprocessFirstRoundByes();
+      this.saveBracket();
+    },
+
+    // Re-evaluate BYEs in Round 0 and reset/update Round 1 slots accordingly
+    reprocessFirstRoundByes() {
+      if (!this.bracket.isCreated || !this.bracket.rounds.length) return;
+      const r0 = this.bracket.rounds[0];
+      for (const match of r0.matches) {
+        const hasByeA = match.teamA && match.teamA.isBye;
+        const hasByeB = match.teamB && match.teamB.isBye;
+        if (hasByeB && match.teamA && !hasByeA) {
           match.status = 'BYE';
+          match.scoreA = null;
+          match.scoreB = null;
           this.advanceBracketMatchWinner(match, match.teamA.id, null, null, false);
+        } else if (hasByeA && match.teamB && !hasByeB) {
+          match.status = 'BYE';
+          match.scoreA = null;
+          match.scoreB = null;
+          this.advanceBracketMatchWinner(match, match.teamB.id, null, null, false);
+        } else {
+          if (match.status === 'BYE') {
+            match.status = 'PENDING';
+            match.winnerId = null;
+          }
         }
+      }
+    },
+
+    // Admin Feature 1: Change team in any slot of a match (with automatic swap if the selected team is already in another match in the same round)
+    changeBracketSlotTeam(roundIndex, matchIndex, slotKey, newTeamId) {
+      if (!this.bracket.isCreated || !this.bracket.rounds[roundIndex]) return;
+      const round = this.bracket.rounds[roundIndex];
+      const targetMatch = round.matches[matchIndex];
+      if (!targetMatch) return;
+
+      const currentSlotTeam = slotKey === 'A' ? targetMatch.teamA : targetMatch.teamB;
+
+      // Build new team object
+      let newTeamObj = null;
+      if (newTeamId === 'BYE') {
+        newTeamObj = { id: 'BYE', name: 'BYE (Lolos Langsung)', isBye: true };
+      } else if (newTeamId === '') {
+        newTeamObj = null;
+      } else {
+        const foundMaster = this.masterTeams.find((t) => t.id === newTeamId);
+        if (foundMaster) {
+          newTeamObj = { id: foundMaster.id, name: foundMaster.name };
+        }
+      }
+
+      // If selecting a real team, check if that team already exists somewhere in this same round -> Auto-Swap!
+      if (newTeamObj && !newTeamObj.isBye) {
+        for (let mIdx = 0; mIdx < round.matches.length; mIdx++) {
+          const m = round.matches[mIdx];
+          if (m.teamA && m.teamA.id === newTeamObj.id) {
+            m.teamA = currentSlotTeam ? { ...currentSlotTeam } : null;
+            m.winnerId = null;
+            m.scoreA = null;
+            m.scoreB = null;
+            m.status = 'PENDING';
+            break;
+          }
+          if (m.teamB && m.teamB.id === newTeamObj.id) {
+            m.teamB = currentSlotTeam ? { ...currentSlotTeam } : null;
+            m.winnerId = null;
+            m.scoreA = null;
+            m.scoreB = null;
+            m.status = 'PENDING';
+            break;
+          }
+        }
+      }
+
+      // Assign to target slot
+      if (slotKey === 'A') {
+        targetMatch.teamA = newTeamObj;
+      } else {
+        targetMatch.teamB = newTeamObj;
+      }
+
+      // Reset target match result
+      targetMatch.winnerId = null;
+      targetMatch.scoreA = null;
+      targetMatch.scoreB = null;
+      targetMatch.status = 'PENDING';
+
+      if (roundIndex === 0) {
+        this.reprocessFirstRoundByes();
+      }
+      this.saveBracket();
+    },
+
+    // Swap Team A and Team B inside the same match
+    swapTeamsInsideBracketMatch(roundIndex, matchIndex) {
+      if (!this.bracket.isCreated || !this.bracket.rounds[roundIndex]) return;
+      const m = this.bracket.rounds[roundIndex].matches[matchIndex];
+      if (!m) return;
+      const temp = m.teamA;
+      m.teamA = m.teamB;
+      m.teamB = temp;
+      const tempScore = m.scoreA;
+      m.scoreA = m.scoreB;
+      m.scoreB = tempScore;
+      this.saveBracket();
+    },
+
+    // Admin Feature 2: Move / Swap entire Match order (e.g. Swap Match #1 with Match #2 or any other Match in the round)
+    moveBracketMatchOrder(roundIndex, fromMatchIndex, toMatchIndex) {
+      if (!this.bracket.isCreated || !this.bracket.rounds[roundIndex]) return;
+      const round = this.bracket.rounds[roundIndex];
+      if (
+        toMatchIndex < 0 ||
+        toMatchIndex >= round.matches.length ||
+        fromMatchIndex === toMatchIndex
+      ) {
+        return;
+      }
+
+      const matchFrom = round.matches[fromMatchIndex];
+      const matchTo = round.matches[toMatchIndex];
+
+      // Swap teams and state between the two bracket positions
+      const tempData = {
+        teamA: matchFrom.teamA,
+        teamB: matchFrom.teamB,
+        scoreA: matchFrom.scoreA,
+        scoreB: matchFrom.scoreB,
+        winnerId: matchFrom.winnerId,
+        status: matchFrom.status
+      };
+
+      matchFrom.teamA = matchTo.teamA;
+      matchFrom.teamB = matchTo.teamB;
+      matchFrom.scoreA = matchTo.scoreA;
+      matchFrom.scoreB = matchTo.scoreB;
+      matchFrom.winnerId = matchTo.winnerId;
+      matchFrom.status = matchTo.status;
+
+      matchTo.teamA = tempData.teamA;
+      matchTo.teamB = tempData.teamB;
+      matchTo.scoreA = tempData.scoreA;
+      matchTo.scoreB = tempData.scoreB;
+      matchTo.winnerId = tempData.winnerId;
+      matchTo.status = tempData.status;
+
+      // Re-propagate winners or BYEs if needed
+      if (roundIndex === 0) {
+        this.reprocessFirstRoundByes();
+      }
+      if (matchFrom.winnerId) {
+        this.advanceBracketMatchWinner(matchFrom, matchFrom.winnerId, matchFrom.scoreA, matchFrom.scoreB, false);
+      }
+      if (matchTo.winnerId) {
+        this.advanceBracketMatchWinner(matchTo, matchTo.winnerId, matchTo.scoreA, matchTo.scoreB, false);
       }
 
       this.saveBracket();

@@ -738,6 +738,15 @@
           <div class="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
+              x-show="bracket.isCreated"
+              @click="bracket.editMode = !bracket.editMode; saveBracket()"
+              :class="bracket.editMode ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'"
+              class="px-3.5 py-2.5 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
+            >
+              <span x-text="bracket.editMode ? '✅ Selesai Atur Bracket' : '✏️ Atur Manual Tim & Urutan'"></span>
+            </button>
+            <button
+              type="button"
               @click="generateBracket(true)"
               class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5"
             >
@@ -752,6 +761,30 @@
               📋 Buat Urut Daftar Tim
             </button>
           </div>
+        </div>
+
+        <!-- Info Banner when Edit Mode is Active -->
+        <div
+          x-show="bracket.isCreated && bracket.editMode"
+          x-transition
+          class="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"
+        >
+          <div class="space-y-0.5">
+            <div class="font-extrabold flex items-center gap-1.5">
+              <span>🛠️</span> Mode Edit Manual Bracket Aktif (Khusus Admin)
+            </div>
+            <p class="text-[11px] text-amber-800">
+              • Gunakan <strong>dropdown nama tim</strong> di setiap kotak untuk mengganti siapa lawan siapa (tim otomatis bertukar tempat agar tidak ada tim ganda).<br/>
+              • Gunakan dropdown <strong>"Urutan: Match #..."</strong> atau tombol <strong>↑ / ↓</strong> untuk memindahkan pasangan pertandingan ke posisi bracket lain.
+            </p>
+          </div>
+          <button
+            type="button"
+            @click="bracket.editMode = false; saveBracket()"
+            class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs shrink-0"
+          >
+            Simpan & Tutup Edit
+          </button>
         </div>
 
         <!-- PODIUM JUARA 1, 2, DAN 3 -->
@@ -816,81 +849,166 @@
 
                 <!-- Matches inside this Round -->
                 <div class="flex-1 flex flex-col justify-around gap-4">
-                  <template x-for="m in round.matches" :key="m.id">
+                  <template x-for="(m, mIdx) in round.matches" :key="m.id">
                     <div
                       class="bg-white border-2 rounded-2xl p-3.5 shadow-sm space-y-2.5 transition"
-                      :class="bracket.activeBracketMatchId === m.id ? 'border-emerald-500 ring-2 ring-emerald-500/20' : (m.winnerId ? 'border-slate-200' : 'border-slate-300')"
+                      :class="bracket.editMode ? 'border-amber-400 bg-amber-50/10' : (bracket.activeBracketMatchId === m.id ? 'border-emerald-500 ring-2 ring-emerald-500/20' : (m.winnerId ? 'border-slate-200' : 'border-slate-300'))"
                     >
-                      <!-- Match Top Bar -->
-                      <div class="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                        <span x-text="m.label"></span>
-                        <span x-show="m.status === 'BYE'" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">LOLOS BYE</span>
-                        <span x-show="m.status === 'FINISHED'" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">SELESAI</span>
-                        <span x-show="round.roundIndex < bracket.rounds.length - 2 && m.status === 'FINISHED'" class="text-rose-500 font-semibold">Kalah = Gugur</span>
-                      </div>
-
-                      <!-- Team A Slot -->
-                      <div
-                        class="flex items-center justify-between px-3 py-2 rounded-xl border text-xs transition"
-                        :class="m.winnerId && m.teamA && m.winnerId === m.teamA.id
-                          ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
-                          : (m.winnerId && m.teamA && m.winnerId !== m.teamA.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
-                      >
-                        <div class="flex items-center gap-1.5 truncate pr-2">
-                          <span x-show="m.winnerId && m.teamA && m.winnerId === m.teamA.id" class="text-emerald-600">✔</span>
-                          <span class="truncate" x-text="m.teamA ? m.teamA.name : 'Menunggu Pemenang...'"></span>
+                      <!-- Match Top Bar + Admin Order Controls -->
+                      <div class="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-500">
+                        <div class="flex items-center gap-1">
+                          <span class="text-slate-700 font-extrabold" x-text="m.label"></span>
+                          <span x-show="m.status === 'BYE'" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">LOLOS BYE</span>
+                          <span x-show="m.status === 'FINISHED'" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">SELESAI</span>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                          <span
-                            x-show="m.scoreA !== null"
-                            class="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
-                            x-text="m.scoreA"
-                          ></span>
+
+                        <!-- Admin Reorder Controls (Shown in Edit Mode when round has >1 match) -->
+                        <div x-show="bracket.editMode && round.matches.length > 1" class="flex items-center gap-1">
+                          <select
+                            @change="moveBracketMatchOrder(round.roundIndex, mIdx, parseInt($event.target.value, 10)); $event.target.value = mIdx"
+                            class="bg-amber-50 border border-amber-300 text-amber-900 rounded px-1.5 py-0.5 text-[10px] font-extrabold focus:outline-none"
+                            title="Pindahkan ke urutan Match lain"
+                          >
+                            <template x-for="(otherM, oIdx) in round.matches" :key="otherM.id">
+                              <option :value="oIdx" :selected="oIdx === mIdx" x-text="oIdx === mIdx ? 'Posisi: ' + otherM.label : 'Tukar ke ' + otherM.label"></option>
+                            </template>
+                          </select>
                           <button
                             type="button"
-                            x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamA.id"
-                            @click="advanceBracketMatchWinner(m, m.teamA.id)"
-                            title="Set Menang Cepat"
-                            class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                            :disabled="mIdx === 0"
+                            @click="moveBracketMatchOrder(round.roundIndex, mIdx, mIdx - 1)"
+                            title="Geser Match ke Atas"
+                            class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-amber-200 disabled:opacity-30 text-slate-700 font-black"
                           >
-                            Menang
+                            ↑
                           </button>
+                          <button
+                            type="button"
+                            :disabled="mIdx === round.matches.length - 1"
+                            @click="moveBracketMatchOrder(round.roundIndex, mIdx, mIdx + 1)"
+                            title="Geser Match ke Bawah"
+                            class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-amber-200 disabled:opacity-30 text-slate-700 font-black"
+                          >
+                            ↓
+                          </button>
+                        </div>
+
+                        <span x-show="!bracket.editMode && round.roundIndex < bracket.rounds.length - 2 && m.status === 'FINISHED'" class="text-rose-500 font-semibold">Kalah = Gugur</span>
+                      </div>
+
+                      <!-- ========================================== -->
+                      <!-- NORMAL VIEW MODE: TEAM A & TEAM B SLOTS    -->
+                      <!-- ========================================== -->
+                      <div x-show="!bracket.editMode" class="space-y-2">
+                        <!-- Team A Slot -->
+                        <div
+                          class="flex items-center justify-between px-3 py-2 rounded-xl border text-xs transition"
+                          :class="m.winnerId && m.teamA && m.winnerId === m.teamA.id
+                            ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
+                            : (m.winnerId && m.teamA && m.winnerId !== m.teamA.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
+                        >
+                          <div class="flex items-center gap-1.5 truncate pr-2">
+                            <span x-show="m.winnerId && m.teamA && m.winnerId === m.teamA.id" class="text-emerald-600">✔</span>
+                            <span class="truncate" x-text="m.teamA ? m.teamA.name : 'Menunggu Pemenang...'"></span>
+                          </div>
+                          <div class="flex items-center gap-1.5 shrink-0">
+                            <span
+                              x-show="m.scoreA !== null"
+                              class="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                              x-text="m.scoreA"
+                            ></span>
+                            <button
+                              type="button"
+                              x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamA.id"
+                              @click="advanceBracketMatchWinner(m, m.teamA.id)"
+                              title="Set Menang Cepat"
+                              class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                            >
+                              Menang
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Team B Slot -->
+                        <div
+                          class="flex items-center justify-between px-3 py-2 rounded-xl border text-xs transition"
+                          :class="m.winnerId && m.teamB && m.winnerId === m.teamB.id
+                            ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
+                            : (m.winnerId && m.teamB && m.winnerId !== m.teamB.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
+                        >
+                          <div class="flex items-center gap-1.5 truncate pr-2">
+                            <span x-show="m.winnerId && m.teamB && m.winnerId === m.teamB.id" class="text-emerald-600">✔</span>
+                            <span class="truncate" x-text="m.teamB ? m.teamB.name : 'Menunggu Pemenang...'"></span>
+                          </div>
+                          <div class="flex items-center gap-1.5 shrink-0">
+                            <span
+                              x-show="m.scoreB !== null"
+                              class="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                              x-text="m.scoreB"
+                            ></span>
+                            <button
+                              type="button"
+                              x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamB.id"
+                              @click="advanceBracketMatchWinner(m, m.teamB.id)"
+                              title="Set Menang Cepat"
+                              class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                            >
+                              Menang
+                            </button>
+                          </div>
                         </div>
                       </div>
 
-                      <!-- Team B Slot -->
-                      <div
-                        class="flex items-center justify-between px-3 py-2 rounded-xl border text-xs transition"
-                        :class="m.winnerId && m.teamB && m.winnerId === m.teamB.id
-                          ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
-                          : (m.winnerId && m.teamB && m.winnerId !== m.teamB.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
-                      >
-                        <div class="flex items-center gap-1.5 truncate pr-2">
-                          <span x-show="m.winnerId && m.teamB && m.winnerId === m.teamB.id" class="text-emerald-600">✔</span>
-                          <span class="truncate" x-text="m.teamB ? m.teamB.name : 'Menunggu Pemenang...'"></span>
+                      <!-- ========================================== -->
+                      <!-- ADMIN EDIT MODE: SELECT WHO VS WHO         -->
+                      <!-- ========================================== -->
+                      <div x-show="bracket.editMode" class="space-y-2 bg-amber-50/50 p-2 rounded-xl border border-amber-200">
+                        <div>
+                          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Slot Tim 1:</label>
+                          <select
+                            :value="m.teamA ? m.teamA.id : ''"
+                            @change="changeBracketSlotTeam(round.roundIndex, mIdx, 'A', $event.target.value)"
+                            class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
+                          >
+                            <option value="">-- Kosong / Menunggu --</option>
+                            <template x-for="t in masterTeams" :key="'selA-' + m.id + '-' + t.id">
+                              <option :value="t.id" :selected="m.teamA && m.teamA.id === t.id" x-text="t.name"></option>
+                            </template>
+                            <option value="BYE" :selected="m.teamA && m.teamA.isBye">BYE (Lolos Langsung)</option>
+                          </select>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                          <span
-                            x-show="m.scoreB !== null"
-                            class="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
-                            x-text="m.scoreB"
-                          ></span>
+
+                        <div class="flex items-center justify-between px-1">
+                          <span class="text-[10px] font-black text-amber-700">VS</span>
                           <button
                             type="button"
-                            x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamB.id"
-                            @click="advanceBracketMatchWinner(m, m.teamB.id)"
-                            title="Set Menang Cepat"
-                            class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                            @click="swapTeamsInsideBracketMatch(round.roundIndex, mIdx)"
+                            class="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold transition"
                           >
-                            Menang
+                            ⇅ Tukar Atas/Bawah
                           </button>
+                        </div>
+
+                        <div>
+                          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Slot Tim 2:</label>
+                          <select
+                            :value="m.teamB ? m.teamB.id : ''"
+                            @change="changeBracketSlotTeam(round.roundIndex, mIdx, 'B', $event.target.value)"
+                            class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
+                          >
+                            <option value="">-- Kosong / Menunggu --</option>
+                            <template x-for="t in masterTeams" :key="'selB-' + m.id + '-' + t.id">
+                              <option :value="t.id" :selected="m.teamB && m.teamB.id === t.id" x-text="t.name"></option>
+                            </template>
+                            <option value="BYE" :selected="m.teamB && m.teamB.isBye">BYE (Lolos Langsung)</option>
+                          </select>
                         </div>
                       </div>
 
                       <!-- Action Button: Mainkan di Lapangan -->
                       <button
                         type="button"
-                        x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye"
+                        x-show="!bracket.editMode && m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye"
                         @click="playBracketMatch(m)"
                         class="w-full py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 text-[11px] font-extrabold transition flex items-center justify-center gap-1.5"
                       >
@@ -1902,11 +2020,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=6"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=5').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
           reg.update();
         }).catch(() => {});
       });
