@@ -29,7 +29,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -2221,6 +2221,13 @@
       <div>
         <span class="text-xs font-extrabold uppercase tracking-widest text-emerald-600">Pemenang Pertandingan</span>
         <h3 class="text-xl sm:text-2xl font-black text-slate-900 mt-1" x-text="getTeamName(match.winnerTeam)"></h3>
+        <div
+          x-show="modals.matchEnd.bracketUpdatedLabel"
+          class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-extrabold text-emerald-800"
+        >
+          <span>🏆</span>
+          <span x-text="modals.matchEnd.bracketUpdatedLabel"></span>
+        </div>
       </div>
 
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-left">
@@ -2262,10 +2269,10 @@
         <button
           type="button"
           x-show="bracket.isCreated"
-          @click="modals.matchEnd.open = false; screen = 'bracket'"
+          @click="finishAndGoToBracket()"
           class="px-3 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-xl text-xs transition"
         >
-          🏆 Bracket
+          🏆 Lihat Bracket
         </button>
         <button
           type="button"
@@ -2279,11 +2286,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=9"></script>
+  <script src="js/app.js?v=10"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=9').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=10').then((reg) => {
           reg.update();
         }).catch(() => {});
       });

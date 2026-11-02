@@ -67,9 +67,12 @@ function badmintonApp() {
     syncState: {
       status: 'connecting', // 'synced' | 'syncing' | 'offline' | 'connecting'
       lastServerUpdatedAt: 0,
+      lastLocalMutationAt: 0,
       pollTimerId: null,
+      pendingPushes: 0,
       isPushing: false
     },
+    _pushQueue: Promise.resolve(),
 
     // Master Teams Database (Managed on the 'teams' screen)
     masterTeams: [],
@@ -164,7 +167,8 @@ function badmintonApp() {
         nextSetTeamBFirstRight: 'male'
       },
       matchEnd: {
-        open: false
+        open: false,
+        bracketUpdatedLabel: ''
       }
     },
 
@@ -234,7 +238,14 @@ function badmintonApp() {
     },
 
     async pullFromServer() {
-      if (this.syncState.isPushing) return;
+      // Never pull/overwrite while a push is in flight or within 2.5s of a local action
+      if (
+        this.syncState.isPushing ||
+        this.syncState.pendingPushes > 0 ||
+        Date.now() - (this.syncState.lastLocalMutationAt || 0) < 2500
+      ) {
+        return;
+      }
       try {
         const since = this.syncState.lastServerUpdatedAt || 0;
         const res = await fetch(`./api.php?since=${since}`, { cache: 'no-store' });
@@ -242,7 +253,13 @@ function badmintonApp() {
         const json = await res.json();
         if (json && json.ok) {
           this.syncState.status = 'synced';
-          if (json.changed && json.data && !this.syncState.isPushing) {
+          if (
+            json.changed &&
+            json.data &&
+            !this.syncState.isPushing &&
+            this.syncState.pendingPushes === 0 &&
+            Date.now() - (this.syncState.lastLocalMutationAt || 0) >= 2500
+          ) {
             this.applyServerState(json.data, json.updatedAt);
           }
         }
@@ -280,35 +297,53 @@ function badmintonApp() {
         this.config = { ...this.config, ...serverData.activeMatch.config };
         this.match = { ...this.match, ...serverData.activeMatch.match };
         localStorage.setItem(STORAGE_KEY_ACTIVE, JSON.stringify(serverData.activeMatch));
-      } else if (serverData.activeMatch === null && this.match.isActive) {
+      } else if (serverData.activeMatch === null && this.match.isActive && !this.modals.matchEnd.open) {
         this.match.isActive = false;
         localStorage.removeItem(STORAGE_KEY_ACTIVE);
       }
 
-      this.ensureDistinctTeams();
+      if (!this.match.isActive) {
+        this.ensureDistinctTeams();
+      }
       this.syncMaxCap();
     },
 
     async pushToServer(partialPayload) {
+      this.syncState.lastLocalMutationAt = Date.now();
+      this.syncState.pendingPushes = (this.syncState.pendingPushes || 0) + 1;
       this.syncState.isPushing = true;
       this.syncState.status = 'syncing';
-      try {
-        const res = await fetch('./api.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(partialPayload)
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
-        if (json && json.ok) {
-          this.syncState.lastServerUpdatedAt = json.updatedAt || Date.now();
-          this.syncState.status = 'synced';
+
+      // Snapshot payload immediately so subsequent mutations don't race
+      const bodyStr = JSON.stringify(partialPayload);
+
+      const runTask = async () => {
+        try {
+          const res = await fetch('./api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: bodyStr
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const json = await res.json();
+          if (json && json.ok) {
+            this.syncState.lastServerUpdatedAt = Math.max(
+              this.syncState.lastServerUpdatedAt || 0,
+              json.updatedAt || Date.now()
+            );
+            this.syncState.status = 'synced';
+          }
+        } catch (e) {
+          this.syncState.status = 'offline';
+        } finally {
+          this.syncState.pendingPushes = Math.max(0, (this.syncState.pendingPushes || 1) - 1);
+          this.syncState.isPushing = this.syncState.pendingPushes > 0;
+          this.syncState.lastLocalMutationAt = Date.now();
         }
-      } catch (e) {
-        this.syncState.status = 'offline';
-      } finally {
-        this.syncState.isPushing = false;
-      }
+      };
+
+      this._pushQueue = (this._pushQueue || Promise.resolve()).then(runTask, runTask);
+      return this._pushQueue;
     },
 
     // Ensure Team A and Team B are never the same team
@@ -595,13 +630,24 @@ function badmintonApp() {
       }
     },
 
-    saveBracket() {
+    saveBracket(shouldPush = true) {
       try {
-        if (!this.match || !this.match.isActive || this.match.isFinished) {
+        // Force fresh array reference so Alpine.js always re-renders deep bracket updates immediately
+        if (this.bracket && Array.isArray(this.bracket.rounds)) {
+          this.bracket.rounds = JSON.parse(JSON.stringify(this.bracket.rounds));
+        }
+        if (this.bracket && this.bracket.thirdPlaceMatch) {
+          this.bracket.thirdPlaceMatch = JSON.parse(
+            JSON.stringify(this.bracket.thirdPlaceMatch)
+          );
+        }
+        if (!this.match || !this.match.isActive) {
           this.ensureDistinctTeams();
         }
         localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
-        this.pushToServer({ bracket: this.bracket });
+        if (shouldPush) {
+          this.pushToServer({ bracket: this.bracket });
+        }
       } catch (e) {
         console.warn('Failed to save bracket:', e);
       }
@@ -1015,6 +1061,71 @@ function badmintonApp() {
       return null;
     },
 
+    // Smart auto-detection: finds the bracket match corresponding to the current match teams
+    // Works even if the match was started before activeBracketMatchId was linked!
+    resolveBracketMatchForCurrentTeams() {
+      if (!this.bracket || !this.bracket.isCreated) return null;
+
+      // 1. Check explicit bracketMatchId on active match
+      if (this.match && this.match.bracketMatchId && this.match.bracketMatchId !== 'MANUAL') {
+        const byId = this.findBracketMatchById(this.match.bracketMatchId);
+        if (byId && byId.teamA && byId.teamB) return byId;
+      }
+
+      // 2. Check activeBracketMatchId on bracket state
+      if (this.bracket.activeBracketMatchId && this.bracket.activeBracketMatchId !== 'MANUAL') {
+        const byActiveId = this.findBracketMatchById(this.bracket.activeBracketMatchId);
+        if (byActiveId && byActiveId.teamA && byActiveId.teamB && !byActiveId.winnerId) {
+          return byActiveId;
+        }
+      }
+
+      // 3. Auto-match by Team IDs or Team Names against all playable unfinished bracket matches
+      const idA = this.config.teamA.teamId || '';
+      const idB = this.config.teamB.teamId || '';
+      const nameA = (this.config.teamA.name || '').trim().toLowerCase();
+      const nameB = (this.config.teamB.name || '').trim().toLowerCase();
+
+      const allMatches = [];
+      for (const r of this.bracket.rounds || []) {
+        for (const m of r.matches || []) {
+          allMatches.push(m);
+        }
+      }
+      if (this.bracket.thirdPlaceMatch) {
+        allMatches.push(this.bracket.thirdPlaceMatch);
+      }
+
+      // Prefer unfinished matches first, then any match with these two teams
+      for (const pass of ['unfinished', 'any']) {
+        for (const m of allMatches) {
+          if (!m || !m.teamA || !m.teamB || m.teamA.isBye || m.teamB.isBye) continue;
+          if (pass === 'unfinished' && (m.winnerId || m.status === 'FINISHED')) continue;
+
+          const mIdA = m.teamA.id || '';
+          const mIdB = m.teamB.id || '';
+          const mNameA = (m.teamA.name || '').trim().toLowerCase();
+          const mNameB = (m.teamB.name || '').trim().toLowerCase();
+
+          const idMatch =
+            idA &&
+            idB &&
+            ((mIdA === idA && mIdB === idB) || (mIdA === idB && mIdB === idA));
+          const nameMatch =
+            nameA &&
+            nameB &&
+            ((mNameA === nameA && mNameB === nameB) ||
+              (mNameA === nameB && mNameB === nameA));
+
+          if (idMatch || nameMatch) {
+            return m;
+          }
+        }
+      }
+
+      return null;
+    },
+
     // Computed Tournament Podium (Juara 1, Juara 2, Juara 3)
     get tournamentPodium() {
       if (!this.bracket.isCreated || this.bracket.rounds.length === 0) {
@@ -1263,6 +1374,22 @@ function badmintonApp() {
       const initRightB = this.config.teamB.initialRight || 'male';
       const initLeftB = initRightB === 'male' ? 'female' : 'male';
 
+      // Auto-resolve bracketMatchId if not in MANUAL mode
+      let resolvedBracketMatchId = null;
+      if (this.bracket && this.bracket.isCreated && this.bracket.activeBracketMatchId !== 'MANUAL') {
+        if (this.bracket.activeBracketMatchId) {
+          resolvedBracketMatchId = this.bracket.activeBracketMatchId;
+        } else {
+          const detected = this.resolveBracketMatchForCurrentTeams();
+          if (detected) {
+            resolvedBracketMatchId = detected.id;
+            this.bracket.activeBracketMatchId = detected.id;
+          }
+        }
+      }
+
+      this.modals.matchEnd.bracketUpdatedLabel = '';
+
       this.match = {
         isActive: true,
         isFinished: false,
@@ -1282,10 +1409,7 @@ function badmintonApp() {
         pointLogs: [],
         intervalReachedInCurrentSet: false,
         rubberSwitchReached: false,
-        bracketMatchId:
-          this.bracket.activeBracketMatchId && this.bracket.activeBracketMatchId !== 'MANUAL'
-            ? this.bracket.activeBracketMatchId
-            : null
+        bracketMatchId: resolvedBracketMatchId
       };
 
       const srv = this.currentServerPlayer;
@@ -1300,7 +1424,8 @@ function badmintonApp() {
       const snapshot = JSON.parse(
         JSON.stringify({
           match: this.match,
-          config: this.config
+          config: this.config,
+          bracket: this.bracket
         })
       );
       this.undoStack.push(snapshot);
@@ -1314,11 +1439,20 @@ function badmintonApp() {
       const last = this.undoStack.pop();
       this.match = last.match;
       this.config = last.config;
+      if (last.bracket) {
+        this.bracket = last.bracket;
+        this.saveBracket(false);
+      }
       this.modals.interval.open = false;
       this.modals.setEnd.open = false;
       this.modals.matchEnd.open = false;
+      this.modals.matchEnd.bracketUpdatedLabel = '';
       this.clearIntervalTimer();
       this.saveActiveMatch();
+      this.pushToServer({
+        bracket: this.bracket,
+        activeMatch: { config: this.config, match: this.match }
+      });
     },
 
     addPoint(scoringTeam) {
@@ -1362,7 +1496,9 @@ function badmintonApp() {
 
       if (this.checkIfSetWon(scoringTeam)) {
         this.handleSetWon(scoringTeam);
-        this.saveActiveMatch();
+        if (!this.match.isFinished) {
+          this.saveActiveMatch();
+        }
         return;
       }
 
@@ -1535,27 +1671,63 @@ function badmintonApp() {
       if (this.match.setsWon[winnerTeam] >= setsRequired) {
         this.match.isFinished = true;
         this.match.winnerTeam = winnerTeam;
+        this.modals.matchEnd.bracketUpdatedLabel = '';
 
-        // If this match was launched from the Tournament Bracket, auto-update the Bracket!
-        if (this.match.bracketMatchId) {
-          const bMatch = this.findBracketMatchById(this.match.bracketMatchId);
-          if (bMatch) {
-            const winningTeamId =
-              winnerTeam === 'A' ? this.config.teamA.teamId : this.config.teamB.teamId;
-            this.advanceBracketMatchWinner(
-              bMatch,
-              winningTeamId,
-              this.match.setsWon.A,
-              this.match.setsWon.B,
-              true
-            );
+        // Auto-detect & update the Tournament Bracket (works even if bracketMatchId was null when match started!)
+        const bMatch = this.resolveBracketMatchForCurrentTeams();
+        if (bMatch && bMatch.teamA && bMatch.teamB) {
+          const winCfg = winnerTeam === 'A' ? this.config.teamA : this.config.teamB;
+          const winId = winCfg.teamId || '';
+          const winName = (winCfg.name || '').trim().toLowerCase();
+          const bNameA = (bMatch.teamA.name || '').trim().toLowerCase();
+          const bNameB = (bMatch.teamB.name || '').trim().toLowerCase();
+
+          // Determine if bMatch.teamA corresponds to config.teamA (normal order) or config.teamB (swapped order)
+          const isNormalOrder =
+            (winId && bMatch.teamA.id === this.config.teamA.teamId) ||
+            bNameA === (this.config.teamA.name || '').trim().toLowerCase();
+
+          const bScoreA = isNormalOrder ? this.match.setsWon.A : this.match.setsWon.B;
+          const bScoreB = isNormalOrder ? this.match.setsWon.B : this.match.setsWon.A;
+
+          let winningTeamId = null;
+          if (winId && bMatch.teamA.id === winId) {
+            winningTeamId = bMatch.teamA.id;
+          } else if (winId && bMatch.teamB.id === winId) {
+            winningTeamId = bMatch.teamB.id;
+          } else if (winName && bNameA === winName) {
+            winningTeamId = bMatch.teamA.id;
+          } else if (winName && bNameB === winName) {
+            winningTeamId = bMatch.teamB.id;
+          } else {
+            winningTeamId = winnerTeam === 'A' ? bMatch.teamA.id : bMatch.teamB.id;
           }
+
+          this.advanceBracketMatchWinner(
+            bMatch,
+            winningTeamId,
+            bScoreA,
+            bScoreB,
+            false
+          );
+
+          this.modals.matchEnd.bracketUpdatedLabel = `${bMatch.label}: ${this.getTeamName(winnerTeam)} menang & melaju di Bracket!`;
           this.bracket.activeBracketMatchId = null;
-          this.saveBracket();
+          this.saveBracket(false);
         }
 
         this.modals.matchEnd.open = true;
-        this.recordMatchToHistory();
+        this.recordMatchToHistory(false);
+
+        // Save activeMatch locally and push all updated state atomically in ONE request to api.php
+        const activePayload = { config: this.config, match: this.match };
+        localStorage.setItem(STORAGE_KEY_ACTIVE, JSON.stringify(activePayload));
+        this.pushToServer({
+          bracket: this.bracket,
+          matchHistory: this.matchHistory,
+          activeMatch: activePayload
+        });
+
         this.speakUmpire(`Game, Set, and Match won by ${this.getTeamName(winnerTeam)}!`);
       } else {
         this.modals.setEnd = {
@@ -1713,24 +1885,57 @@ function badmintonApp() {
       this.modals.interval.open = false;
       this.modals.setEnd.open = false;
       this.modals.matchEnd.open = false;
+      this.modals.matchEnd.bracketUpdatedLabel = '';
       this.match.isActive = false;
       localStorage.removeItem(STORAGE_KEY_ACTIVE);
-      this.pushToServer({ activeMatch: null });
 
       // Automatically pre-select the next unfinished match from the Bracket!
       if (this.bracket && this.bracket.isCreated) {
         const nextAvailable = this.availableBracketMatches;
         if (nextAvailable.length > 0) {
-          this.selectBracketMatchInSetup(nextAvailable[0].id);
+          this.selectBracketMatchInSetup(nextAvailable[0].id, false);
         } else {
           this.bracket.activeBracketMatchId = null;
         }
+        localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
       }
+
+      this.pushToServer({
+        activeMatch: null,
+        bracket: this.bracket
+      });
 
       this.screen = 'setup';
     },
 
-    recordMatchToHistory() {
+    finishAndGoToBracket() {
+      this.clearIntervalTimer();
+      this.modals.interval.open = false;
+      this.modals.setEnd.open = false;
+      this.modals.matchEnd.open = false;
+      this.modals.matchEnd.bracketUpdatedLabel = '';
+      this.match.isActive = false;
+      localStorage.removeItem(STORAGE_KEY_ACTIVE);
+
+      if (this.bracket && this.bracket.isCreated) {
+        const nextAvailable = this.availableBracketMatches;
+        if (nextAvailable.length > 0) {
+          this.selectBracketMatchInSetup(nextAvailable[0].id, false);
+        } else {
+          this.bracket.activeBracketMatchId = null;
+        }
+        localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
+      }
+
+      this.pushToServer({
+        activeMatch: null,
+        bracket: this.bracket
+      });
+
+      this.screen = 'bracket';
+    },
+
+    recordMatchToHistory(shouldPush = true) {
       try {
         const entry = {
           id: Date.now(),
@@ -1754,7 +1959,9 @@ function badmintonApp() {
           this.matchHistory.pop();
         }
         localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(this.matchHistory));
-        this.pushToServer({ matchHistory: this.matchHistory });
+        if (shouldPush) {
+          this.pushToServer({ matchHistory: this.matchHistory });
+        }
       } catch (e) {
         console.warn('Failed to save history:', e);
       }
