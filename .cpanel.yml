@@ -3,7 +3,9 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/gfontimo/skor.gfontimo.com/
     - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/cp -R index.html $DEPLOYPATH
+    - /bin/cp -R api.php $DEPLOYPATH
     - /bin/cp -R manifest.json $DEPLOYPATH
     - /bin/cp -R sw.js $DEPLOYPATH
     - /bin/cp -R css $DEPLOYPATH

@@ -63,6 +63,14 @@ function badmintonApp() {
     // Sound / Umpire TTS
     voiceEnabled: true,
 
+    // Centralized Server Sync State
+    syncState: {
+      status: 'connecting', // 'synced' | 'syncing' | 'offline' | 'connecting'
+      lastServerUpdatedAt: 0,
+      pollTimerId: null,
+      isPushing: false
+    },
+
     // Master Teams Database (Managed on the 'teams' screen)
     masterTeams: [],
     newTeamNameInput: '',
@@ -164,13 +172,143 @@ function badmintonApp() {
     matchHistory: [],
 
     // Lifecycle Init
-    init() {
+    async init() {
       this.loadMasterTeams();
       this.loadBracket();
       this.loadHistory();
       this.loadActiveMatch();
       this.ensureDistinctTeams();
       this.syncMaxCap();
+
+      // Connect to Centralized Server API (api.php) and start real-time polling
+      await this.initialServerSync();
+      this.startServerPolling();
+    },
+
+    // ==========================================
+    // CENTRALIZED SERVER SYNC ENGINE (api.php)
+    // ==========================================
+    async initialServerSync() {
+      try {
+        const res = await fetch('./api.php?since=0', { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (!json || !json.ok || !json.data) throw new Error('Invalid API response');
+
+        const serverData = json.data;
+        const serverHasCustomTeams =
+          Array.isArray(serverData.masterTeams) && serverData.masterTeams.length > 4;
+        const serverHasBracket =
+          serverData.bracket && serverData.bracket.isCreated;
+        const localHasCustomTeams =
+          Array.isArray(this.masterTeams) && this.masterTeams.length > 4;
+        const localHasBracket = this.bracket && this.bracket.isCreated;
+
+        // If server is still fresh/empty but this Admin browser already has teams/bracket, push local data to server first!
+        if ((!serverHasCustomTeams && localHasCustomTeams) || (!serverHasBracket && localHasBracket)) {
+          await this.pushToServer({
+            masterTeams: this.masterTeams,
+            bracket: this.bracket,
+            activeMatch: this.match.isActive
+              ? { config: this.config, match: this.match }
+              : null,
+            matchHistory: this.matchHistory
+          });
+        } else {
+          this.applyServerState(serverData, json.updatedAt);
+        }
+
+        this.syncState.status = 'synced';
+      } catch (e) {
+        this.syncState.status = 'offline';
+      }
+    },
+
+    startServerPolling() {
+      if (this.syncState.pollTimerId) {
+        clearInterval(this.syncState.pollTimerId);
+      }
+      this.syncState.pollTimerId = setInterval(() => {
+        this.pullFromServer();
+      }, 3000);
+    },
+
+    async pullFromServer() {
+      if (this.syncState.isPushing) return;
+      try {
+        const since = this.syncState.lastServerUpdatedAt || 0;
+        const res = await fetch(`./api.php?since=${since}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (json && json.ok) {
+          this.syncState.status = 'synced';
+          if (json.changed && json.data && !this.syncState.isPushing) {
+            this.applyServerState(json.data, json.updatedAt);
+          }
+        }
+      } catch (e) {
+        this.syncState.status = 'offline';
+      }
+    },
+
+    applyServerState(serverData, updatedAt) {
+      this.syncState.lastServerUpdatedAt = updatedAt || Date.now();
+
+      if (Array.isArray(serverData.masterTeams) && serverData.masterTeams.length > 0) {
+        this.masterTeams = serverData.masterTeams;
+        this.initMemberInputs();
+        localStorage.setItem(STORAGE_KEY_TEAMS, JSON.stringify(this.masterTeams));
+      }
+
+      if (serverData.bracket && typeof serverData.bracket === 'object') {
+        // Preserve local editMode if admin is currently editing
+        const currentEditMode = this.bracket.editMode;
+        this.bracket = {
+          ...this.bracket,
+          ...serverData.bracket,
+          editMode: currentEditMode
+        };
+        localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
+      }
+
+      if (Array.isArray(serverData.matchHistory)) {
+        this.matchHistory = serverData.matchHistory;
+        localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(this.matchHistory));
+      }
+
+      if (serverData.activeMatch && serverData.activeMatch.match) {
+        this.config = { ...this.config, ...serverData.activeMatch.config };
+        this.match = { ...this.match, ...serverData.activeMatch.match };
+        localStorage.setItem(STORAGE_KEY_ACTIVE, JSON.stringify(serverData.activeMatch));
+      } else if (serverData.activeMatch === null && this.match.isActive) {
+        this.match.isActive = false;
+        localStorage.removeItem(STORAGE_KEY_ACTIVE);
+      }
+
+      this.ensureDistinctTeams();
+      this.syncMaxCap();
+    },
+
+    async pushToServer(partialPayload) {
+      this.syncState.isPushing = true;
+      this.syncState.status = 'syncing';
+      try {
+        const res = await fetch('./api.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(partialPayload)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (json && json.ok) {
+          this.syncState.lastServerUpdatedAt = json.updatedAt || Date.now();
+          this.syncState.status = 'synced';
+        }
+      } catch (e) {
+        this.syncState.status = 'offline';
+      } finally {
+        this.syncState.isPushing = false;
+      }
     },
 
     // Ensure Team A and Team B are never the same team
@@ -224,6 +362,7 @@ function badmintonApp() {
     saveMasterTeams() {
       try {
         localStorage.setItem(STORAGE_KEY_TEAMS, JSON.stringify(this.masterTeams));
+        this.pushToServer({ masterTeams: this.masterTeams });
       } catch (e) {
         console.warn('Failed to save master teams:', e);
       }
@@ -369,6 +508,7 @@ function badmintonApp() {
     saveBracket() {
       try {
         localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
+        this.pushToServer({ bracket: this.bracket });
       } catch (e) {
         console.warn('Failed to save bracket:', e);
       }
@@ -1449,6 +1589,7 @@ function badmintonApp() {
           match: this.match
         };
         localStorage.setItem(STORAGE_KEY_ACTIVE, JSON.stringify(payload));
+        this.pushToServer({ activeMatch: payload });
       } catch (e) {
         console.warn('Failed to save match state:', e);
       }
@@ -1478,6 +1619,7 @@ function badmintonApp() {
       this.modals.matchEnd.open = false;
       this.match.isActive = false;
       localStorage.removeItem(STORAGE_KEY_ACTIVE);
+      this.pushToServer({ activeMatch: null });
       this.screen = 'setup';
     },
 
@@ -1505,6 +1647,7 @@ function badmintonApp() {
           this.matchHistory.pop();
         }
         localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(this.matchHistory));
+        this.pushToServer({ matchHistory: this.matchHistory });
       } catch (e) {
         console.warn('Failed to save history:', e);
       }
@@ -1524,6 +1667,7 @@ function badmintonApp() {
     clearHistory() {
       this.matchHistory = [];
       localStorage.removeItem(STORAGE_KEY_HISTORY);
+      this.pushToServer({ matchHistory: [] });
     }
   };
 }

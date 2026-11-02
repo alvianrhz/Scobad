@@ -114,6 +114,27 @@
           <span x-show="matchHistory.length > 0" class="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[10px]" x-text="matchHistory.length"></span>
         </button>
 
+        <!-- Centralized Server Sync Badge -->
+        <div
+          class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold"
+          :class="{
+            'bg-emerald-50 text-emerald-700 border-emerald-200': syncState.status === 'synced',
+            'bg-amber-50 text-amber-700 border-amber-200': syncState.status === 'syncing' || syncState.status === 'connecting',
+            'bg-slate-100 text-slate-500 border-slate-200': syncState.status === 'offline'
+          }"
+          :title="syncState.status === 'synced' ? 'Data Terpusat Aktif (Real-Time Sync)' : (syncState.status === 'offline' ? 'Mode Offline (LocalStorage)' : 'Menyinkronkan ke Server...')"
+        >
+          <span
+            class="w-2 h-2 rounded-full"
+            :class="{
+              'bg-emerald-500': syncState.status === 'synced',
+              'bg-amber-500 animate-ping': syncState.status === 'syncing' || syncState.status === 'connecting',
+              'bg-slate-400': syncState.status === 'offline'
+            }"
+          ></span>
+          <span x-text="syncState.status === 'synced' ? 'Server Sync' : (syncState.status === 'offline' ? 'Offline' : 'Sync...')"></span>
+        </div>
+
         <!-- Umpire Voice Toggle -->
         <button
           @click="voiceEnabled = !voiceEnabled"
@@ -2020,11 +2041,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=6"></script>
+  <script src="js/app.js?v=7"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=6').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=7').then((reg) => {
           reg.update();
         }).catch(() => {});
       });

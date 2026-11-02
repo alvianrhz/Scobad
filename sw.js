@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skor-badminton-v6';
+const CACHE_NAME = 'skor-badminton-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -24,12 +24,17 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-First strategy: always load fresh files when available, fallback to cache when offline
+// Network-First strategy: never cache api.php requests, cache static assets
 self.addEventListener('fetch', (event) => {
+  if (event.request.url.includes('api.php') || event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+        if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         }
