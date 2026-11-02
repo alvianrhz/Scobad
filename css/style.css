@@ -1,0 +1,120 @@
+/* Clean Light Mode Styles for Badminton Mixed Doubles Score & Position Guide */
+
+:root {
+  --court-green: #059669;
+  --court-green-dark: #047857;
+  --court-line: rgba(255, 255, 255, 0.95);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Badminton Court Container */
+.badminton-court {
+  background: linear-gradient(135deg, #047857 0%, #059669 50%, #047857 100%);
+  border: 3px solid #ffffff;
+  box-shadow: 0 12px 24px -6px rgba(5, 150, 105, 0.3), inset 0 0 30px rgba(0, 0, 0, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Net line in the center */
+.court-net {
+  background: repeating-linear-gradient(
+    to bottom,
+    #fde047 0px,
+    #fde047 6px,
+    rgba(255, 255, 255, 0.4) 6px,
+    rgba(255, 255, 255, 0.4) 12px
+  );
+  box-shadow: 0 0 10px rgba(253, 224, 71, 0.7);
+}
+
+/* Active Server Box Highlight */
+.court-box-server {
+  background: rgba(250, 204, 21, 0.22);
+  box-shadow: inset 0 0 0 2.5px rgba(250, 204, 21, 0.9);
+}
+
+/* Active Receiver Box Highlight */
+.court-box-receiver {
+  background: rgba(56, 189, 248, 0.2);
+  box-shadow: inset 0 0 0 2.5px rgba(56, 189, 248, 0.85);
+}
+
+/* Pulse animation for active server badge */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.97);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    transform: scale(0.97);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+.server-pulse {
+  animation: pulse-ring 1.8s infinite;
+}
+
+/* Player card transition when swapping positions */
+.player-card {
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.player-card-swapped {
+  animation: swap-bounce 0.55s ease-out;
+}
+
+@keyframes swap-bounce {
+  0% {
+    transform: scale(0.88);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Animated dashed arrow for service direction */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.service-arrow-line {
+  stroke-dasharray: 8, 6;
+  animation: dash-flow 0.9s linear infinite;
+}
+
+/* Custom Light Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

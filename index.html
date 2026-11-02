@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Skor Badminton Ganda Campuran — Panduan Posisi & Servis BWF</title>
+  <meta name="description" content="Aplikasi penghitung skor badminton ganda campuran lengkap dengan visualisasi perpindahan posisi ganjil-genap dan servis resmi BWF." />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css?v=3" />
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col" x-data="badmintonApp()" x-init="init()">
+
+  <!-- ========================================== -->
+  <!-- TOP NAVIGATION BAR (WHITE & CLEAN)         -->
+  <!-- ========================================== -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-6xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shadow-sm">
+          <span class="text-lg">🏸</span>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 leading-none">
+            Skor<span class="text-emerald-600">Badminton</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 hidden sm:block">Ganda Campuran • Panduan Posisi & Servis BWF</p>
+        </div>
+      </div>
+
+      <!-- Nav Tabs & Controls -->
+      <div class="flex items-center gap-1 sm:gap-2">
+        <button
+          @click="screen = 'setup'"
+          :class="screen === 'setup' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1"
+        >
+          <span>⚙️</span>
+          <span>Setup</span>
+        </button>
+
+        <button
+          @click="screen = 'teams'"
+          :class="screen === 'teams' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1"
+        >
+          <span>👥</span>
+          <span>Daftar Tim</span>
+          <span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-extrabold" x-text="masterTeams.length"></span>
+        </button>
+
+        <button
+          x-show="match.isActive"
+          @click="screen = 'match'"
+          :class="screen === 'match' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1"
+        >
+          <span>🏟️</span>
+          <span>Lapangan</span>
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping" x-show="!match.isFinished"></span>
+        </button>
+
+        <button
+          @click="screen = 'rules'"
+          :class="screen === 'rules' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1"
+        >
+          <span>📖</span>
+          <span class="hidden md:inline">Aturan</span>
+        </button>
+
+        <button
+          @click="screen = 'history'"
+          :class="screen === 'history' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1"
+        >
+          <span>🕒</span>
+          <span class="hidden sm:inline">Riwayat</span>
+          <span x-show="matchHistory.length > 0" class="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[10px]" x-text="matchHistory.length"></span>
+        </button>
+
+        <!-- Umpire Voice Toggle -->
+        <button
+          @click="voiceEnabled = !voiceEnabled"
+          :title="voiceEnabled ? 'Suara Wasit Aktif' : 'Suara Wasit Mati'"
+          :class="voiceEnabled ? 'bg-amber-50 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-400 border-slate-200'"
+          class="p-1.5 rounded-lg border text-xs transition"
+        >
+          <span x-text="voiceEnabled ? '🔊' : '🔇'"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- MAIN CONTENT CONTAINER                     -->
+  <!-- ========================================== -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-5">
+
+    <!-- ========================================== -->
+    <!-- SCREEN 1: SETUP PERTANDINGAN               -->
+    <!-- ========================================== -->
+    <section x-show="screen === 'setup'" x-transition.opacity class="space-y-5">
+      <!-- Banner Resume if Active Match Exists -->
+      <div
+        x-show="match.isActive && !match.isFinished"
+        class="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm"
+      >
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">⚡</span>
+          <div>
+            <h3 class="font-bold text-emerald-900 text-sm">Pertandingan Sedang Berlangsung!</h3>
+            <p class="text-xs text-emerald-700">
+              <span class="font-bold" x-text="getTeamName('A')"></span> (<span x-text="match.scores.A"></span>) vs
+              <span class="font-bold" x-text="getTeamName('B')"></span> (<span x-text="match.scores.B"></span>) — Set <span x-text="match.currentSet"></span>
+            </p>
+          </div>
+        </div>
+        <button
+          @click="screen = 'match'"
+          class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-sm"
+        >
+          Lanjutkan Pertandingan →
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- LEFT COLUMN: Pengaturan Skor & Deuce (5 cols) -->
+        <div class="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 class="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                <span>🎯</span> Aturan Poin & Deuce
+              </h2>
+              <p class="text-xs text-slate-500">Sesuaikan poin maksimal berhenti & batas deuce</p>
+            </div>
+          </div>
+
+          <!-- Preset Buttons -->
+          <div class="space-y-2">
+            <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Pilih Preset Cepat:</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                @click="applyPreset('community15')"
+                :class="config.preset === 'community15' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                class="p-2.5 rounded-xl border text-left transition"
+              >
+                <div class="font-extrabold text-xs">Komunitas 15</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">Deuce maks 18 (+3)</div>
+              </button>
+
+              <button
+                type="button"
+                @click="applyPreset('bwf21')"
+                :class="config.preset === 'bwf21' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                class="p-2.5 rounded-xl border text-left transition"
+              >
+                <div class="font-extrabold text-xs">Resmi BWF 21</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">Deuce maks 30 (+9)</div>
+              </button>
+
+              <button
+                type="button"
+                @click="applyPreset('quick11')"
+                :class="config.preset === 'quick11' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                class="p-2.5 rounded-xl border text-left transition"
+              >
+                <div class="font-extrabold text-xs">Cepat 11 Poin</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">Deuce maks 14 (+3)</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Custom Target Points Input -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">
+                Poin Maksimal Normal
+              </label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="3"
+                  max="99"
+                  x-model.number="config.targetPoints"
+                  @input="onTargetPointInput()"
+                  class="w-full bg-white border border-slate-300 focus:border-emerald-600 focus:outline-none rounded-lg px-3 py-1.5 text-lg font-extrabold text-slate-900 text-center"
+                />
+                <span class="text-xs text-slate-500 font-semibold">Poin</span>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">
+                Batas Tambahan Deuce
+              </label>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-black text-emerald-600">+</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  :disabled="!config.deuceEnabled"
+                  x-model.number="config.deuceAllowance"
+                  @input="onDeuceAllowanceInput()"
+                  class="w-full bg-white border border-slate-300 focus:border-emerald-600 disabled:opacity-40 focus:outline-none rounded-lg px-3 py-1.5 text-lg font-extrabold text-amber-600 text-center"
+                />
+                <span class="text-xs text-slate-500 font-semibold">Poin</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Enable/Disable Deuce & Best Of Sets -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-800">Aturan Deuce</div>
+                <div class="text-[11px] text-slate-500">Selisih 2 poin</div>
+              </div>
+              <button
+                type="button"
+                @click="config.deuceEnabled = !config.deuceEnabled; syncMaxCap()"
+                :class="config.deuceEnabled ? 'bg-emerald-600' : 'bg-slate-300'"
+                class="w-12 h-6 rounded-full p-1 transition flex items-center"
+              >
+                <div
+                  :class="config.deuceEnabled ? 'translate-x-6' : 'translate-x-0'"
+                  class="w-4 h-4 bg-white rounded-full transition transform shadow"
+                ></div>
+              </button>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <label class="block text-xs font-bold text-slate-800 mb-1">Format Set</label>
+              <select
+                x-model.number="config.bestOf"
+                class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 focus:outline-none"
+              >
+                <option :value="3">Best of 3 (Menang 2 Set)</option>
+                <option :value="1">1 Set Langsung Selesai</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dynamic Rules Summary Box -->
+          <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 space-y-1.5 text-xs">
+            <div class="font-bold text-emerald-900 flex items-center gap-1.5">
+              <span>📌</span> Ringkasan Aturan Pertandingan Ini:
+            </div>
+            <ul class="space-y-1 text-slate-700 list-disc list-inside text-[11px] leading-relaxed">
+              <li>
+                Tim yang mencetak <strong class="text-slate-900" x-text="config.targetPoints + ' poin'"></strong> lebih dulu dinyatakan menang set.
+              </li>
+              <li x-show="config.deuceEnabled">
+                Jika skor imbang <strong class="text-amber-700" x-text="deuceTriggerScore + ' - ' + deuceTriggerScore"></strong> (<em>Deuce</em>), permainan lanjut hingga selisih 2 poin.
+              </li>
+              <li x-show="config.deuceEnabled">
+                Batas maksimal Deuce adalah <strong class="text-rose-600" x-text="config.maxCap + ' poin'"></strong> (+<span x-text="config.deuceAllowance"></span> poin). Jika imbang <span x-text="(config.maxCap - 1) + '-' + (config.maxCap - 1)"></span>, poin ke-<strong class="text-slate-900" x-text="config.maxCap"></strong> langsung menang!
+              </li>
+              <li x-show="!config.deuceEnabled">
+                <strong>Tanpa Deuce:</strong> Saat skor <span x-text="deuceTriggerScore + '-' + deuceTriggerScore"></span>, poin ke-<span x-text="config.targetPoints"></span> langsung menang.
+              </li>
+              <li>
+                Interval istirahat otomatis saat salah satu tim mencapai <strong class="text-sky-700" x-text="'poin ' + intervalScoreTrigger"></strong>.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Pilih Tim & Anggota yang Bermain (7 cols) -->
+        <div class="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm flex flex-col justify-between">
+          <div class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+              <div>
+                <h2 class="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                  <span>👫</span> Pilih Tim & Pasangan Pemain (Set 1)
+                </h2>
+                <p class="text-xs text-slate-500">
+                  Pilih tim dari daftar, lalu klik nama anggota yang turun bermain
+                </p>
+              </div>
+              <button
+                type="button"
+                @click="screen = 'teams'"
+                class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-auto"
+              >
+                <span>👥</span>
+                <span>Kelola Daftar Tim & Anggota →</span>
+              </button>
+            </div>
+
+            <!-- Team A & Team B Selection Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- ========================================== -->
+              <!-- TEAM A CARD                                -->
+              <!-- ========================================== -->
+              <div class="bg-slate-50 border border-emerald-200 rounded-xl p-4 space-y-3.5">
+                <div class="flex items-center justify-between">
+                  <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded border border-emerald-200">
+                    Pasangan Tim A
+                  </span>
+                  <button
+                    type="button"
+                    @click="config.firstServerTeam = 'A'"
+                    :class="config.firstServerTeam === 'A' ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm' : 'bg-white text-slate-500 border border-slate-200'"
+                    class="px-2.5 py-1 rounded-lg text-[11px] transition flex items-center gap-1"
+                  >
+                    <span>🏸</span>
+                    <span x-text="config.firstServerTeam === 'A' ? 'Servis Pertama' : 'Pilih Servis'"></span>
+                  </button>
+                </div>
+
+                <!-- Dropdown Pilih Tim A -->
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Pilih Tim A:</label>
+                  <select
+                    x-model="config.teamA.teamId"
+                    @change="onSelectTeamInSetup('A', $event.target.value)"
+                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-extrabold text-slate-900 focus:border-emerald-600 focus:outline-none shadow-sm"
+                  >
+                    <option value="">-- Pilih atau Ketik Manual --</option>
+                    <template x-for="t in masterTeams" :key="t.id">
+                      <option
+                        :value="t.id"
+                        :disabled="config.teamB.teamId === t.id"
+                        x-text="t.name + ' (' + t.members.length + ' anggota)' + (config.teamB.teamId === t.id ? ' — Dipakai Tim B' : '')"
+                      ></option>
+                    </template>
+                  </select>
+                </div>
+
+                <!-- Quick Pick Members from Selected Team A -->
+                <div class="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2" x-show="getTeamMembersList('A').length > 0">
+                  <div class="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                    <span>Klik Anggota <span class="text-emerald-700" x-text="config.teamA.name"></span>:</span>
+                    <span class="text-[10px] text-slate-400">Pilih 1 ♂ & 1 ♀</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="m in getTeamMembersList('A')" :key="m.id">
+                      <button
+                        type="button"
+                        @click="selectMemberForSetup('A', m)"
+                        :class="(m.gender === 'male' && config.teamA.male === m.name) || (m.gender === 'female' && config.teamA.female === m.name)
+                          ? (m.gender === 'male' ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-sm' : 'bg-pink-600 text-white border-pink-600 font-bold shadow-sm')
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                        class="px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1 transition"
+                      >
+                        <span x-text="m.gender === 'male' ? '♂' : '♀'"></span>
+                        <span x-text="m.name"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Selected Male & Female Inputs (Editable) -->
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] text-sky-700 font-bold mb-1">♂ Pemain Pria A</label>
+                    <input
+                      type="text"
+                      x-model="config.teamA.male"
+                      placeholder="Nama Pria"
+                      class="w-full bg-white border border-sky-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-pink-700 font-bold mb-1">♀ Pemain Wanita A</label>
+                    <input
+                      type="text"
+                      x-model="config.teamA.female"
+                      placeholder="Nama Wanita"
+                      class="w-full bg-white border border-pink-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-pink-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <!-- Initial Box Selector for Team A -->
+                <div class="pt-2 border-t border-slate-200">
+                  <label class="block text-[11px] text-slate-600 font-semibold mb-1.5">
+                    Siapa di <strong class="text-emerald-700">Kotak Kanan (Skor 0 / Genap)</strong> saat mulai?
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      @click="config.teamA.initialRight = 'male'"
+                      :class="config.teamA.initialRight === 'male' ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600'"
+                      class="py-1.5 px-2 rounded-lg border text-xs transition truncate"
+                    >
+                      ♂ <span x-text="config.teamA.male || 'Pria A'"></span> (Kanan)
+                    </button>
+                    <button
+                      type="button"
+                      @click="config.teamA.initialRight = 'female'"
+                      :class="config.teamA.initialRight === 'female' ? 'bg-pink-600 text-white border-pink-600 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600'"
+                      class="py-1.5 px-2 rounded-lg border text-xs transition truncate"
+                    >
+                      ♀ <span x-text="config.teamA.female || 'Wanita A'"></span> (Kanan)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ========================================== -->
+              <!-- TEAM B CARD                                -->
+              <!-- ========================================== -->
+              <div class="bg-slate-50 border border-indigo-200 rounded-xl p-4 space-y-3.5">
+                <div class="flex items-center justify-between">
+                  <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 rounded border border-indigo-200">
+                    Pasangan Tim B
+                  </span>
+                  <button
+                    type="button"
+                    @click="config.firstServerTeam = 'B'"
+                    :class="config.firstServerTeam === 'B' ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm' : 'bg-white text-slate-500 border border-slate-200'"
+                    class="px-2.5 py-1 rounded-lg text-[11px] transition flex items-center gap-1"
+                  >
+                    <span>🏸</span>
+                    <span x-text="config.firstServerTeam === 'B' ? 'Servis Pertama' : 'Pilih Servis'"></span>
+                  </button>
+                </div>
+
+                <!-- Dropdown Pilih Tim B -->
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Pilih Tim B:</label>
+                  <select
+                    x-model="config.teamB.teamId"
+                    @change="onSelectTeamInSetup('B', $event.target.value)"
+                    class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-extrabold text-slate-900 focus:border-indigo-600 focus:outline-none shadow-sm"
+                  >
+                    <option value="">-- Pilih atau Ketik Manual --</option>
+                    <template x-for="t in masterTeams" :key="t.id">
+                      <option
+                        :value="t.id"
+                        :disabled="config.teamA.teamId === t.id"
+                        x-text="t.name + ' (' + t.members.length + ' anggota)' + (config.teamA.teamId === t.id ? ' — Dipakai Tim A' : '')"
+                      ></option>
+                    </template>
+                  </select>
+                </div>
+
+                <!-- Quick Pick Members from Selected Team B -->
+                <div class="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2" x-show="getTeamMembersList('B').length > 0">
+                  <div class="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+                    <span>Klik Anggota <span class="text-indigo-700" x-text="config.teamB.name"></span>:</span>
+                    <span class="text-[10px] text-slate-400">Pilih 1 ♂ & 1 ♀</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="m in getTeamMembersList('B')" :key="m.id">
+                      <button
+                        type="button"
+                        @click="selectMemberForSetup('B', m)"
+                        :class="(m.gender === 'male' && config.teamB.male === m.name) || (m.gender === 'female' && config.teamB.female === m.name)
+                          ? (m.gender === 'male' ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-sm' : 'bg-pink-600 text-white border-pink-600 font-bold shadow-sm')
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                        class="px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1 transition"
+                      >
+                        <span x-text="m.gender === 'male' ? '♂' : '♀'"></span>
+                        <span x-text="m.name"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Selected Male & Female Inputs (Editable) -->
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] text-sky-700 font-bold mb-1">♂ Pemain Pria B</label>
+                    <input
+                      type="text"
+                      x-model="config.teamB.male"
+                      placeholder="Nama Pria"
+                      class="w-full bg-white border border-sky-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-sky-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-pink-700 font-bold mb-1">♀ Pemain Wanita B</label>
+                    <input
+                      type="text"
+                      x-model="config.teamB.female"
+                      placeholder="Nama Wanita"
+                      class="w-full bg-white border border-pink-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-pink-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <!-- Initial Box Selector for Team B -->
+                <div class="pt-2 border-t border-slate-200">
+                  <label class="block text-[11px] text-slate-600 font-semibold mb-1.5">
+                    Siapa di <strong class="text-indigo-700">Kotak Kanan (Skor 0 / Genap)</strong> saat mulai?
+                  </label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      @click="config.teamB.initialRight = 'male'"
+                      :class="config.teamB.initialRight === 'male' ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600'"
+                      class="py-1.5 px-2 rounded-lg border text-xs transition truncate"
+                    >
+                      ♂ <span x-text="config.teamB.male || 'Pria B'"></span> (Kanan)
+                    </button>
+                    <button
+                      type="button"
+                      @click="config.teamB.initialRight = 'female'"
+                      :class="config.teamB.initialRight === 'female' ? 'bg-pink-600 text-white border-pink-600 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600'"
+                      class="py-1.5 px-2 rounded-lg border text-xs transition truncate"
+                    >
+                      ♀ <span x-text="config.teamB.female || 'Wanita B'"></span> (Kanan)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Court Side Orientation at Start -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div class="text-xs">
+                <span class="font-bold text-slate-800">Posisi Sisi Lapangan Awal (Dari Sudut Pandang Wasit):</span>
+                <p class="text-[11px] text-slate-600">
+                  Kiri Layar: <strong class="text-emerald-700" x-text="config.teamAOnLeft ? (config.teamA.name || 'Tim A') : (config.teamB.name || 'Tim B')"></strong> •
+                  Kanan Layar: <strong class="text-indigo-700" x-text="config.teamAOnLeft ? (config.teamB.name || 'Tim B') : (config.teamA.name || 'Tim A')"></strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                @click="config.teamAOnLeft = !config.teamAOnLeft"
+                class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-300 transition shrink-0 shadow-sm"
+              >
+                ⇄ Tukar Kiri / Kanan
+              </button>
+            </div>
+          </div>
+
+          <!-- Warning if Same Team Selected -->
+          <div
+            x-show="isSameTeamSelected"
+            class="bg-rose-50 border border-rose-300 text-rose-700 rounded-xl p-3 text-xs font-bold flex items-center gap-2"
+          >
+            <span>⚠️</span>
+            <span>Tim A dan Tim B tidak boleh sama! Silakan pilih tim lawan yang berbeda.</span>
+          </div>
+
+          <!-- Start Match CTA Button -->
+          <button
+            type="button"
+            :disabled="isSameTeamSelected"
+            @click="startNewMatch()"
+            class="w-full py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-black text-base rounded-xl shadow-md shadow-emerald-600/20 transition transform active:scale-[0.99] flex items-center justify-center gap-2"
+          >
+            <span>🚀</span>
+            <span>MULAI PERTANDINGAN BARU</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 2: HALAMAN KHUSUS DAFTAR TIM & ANGGOTA -->
+    <!-- ========================================== -->
+    <section x-show="screen === 'teams'" x-transition.opacity class="space-y-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
+              <span>👥</span> Manajemen Daftar Tim & Anggota (Roster)
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Tambahkan banyak nama tim beserta 4–5+ anggota di dalamnya. Saat mulai pertandingan atau ganti set, Anda tinggal klik memilih!
+            </p>
+          </div>
+          <button
+            type="button"
+            @click="screen = 'setup'"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition self-start sm:self-auto shadow-sm"
+          >
+            ← Kembali ke Setup Pertandingan
+          </button>
+        </div>
+
+        <!-- Form Tambah Tim Baru -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div class="flex-1">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Buat Nama Tim Baru:</label>
+            <input
+              type="text"
+              x-model="newTeamNameInput"
+              @keydown.enter.prevent="createMasterTeam()"
+              placeholder="Contoh: PB Djarum / Tim Elang / RT 05..."
+              class="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            @click="createMasterTeam()"
+            class="sm:mt-5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition shadow-sm shrink-0"
+          >
+            + Tambah Tim Baru
+          </button>
+        </div>
+
+        <!-- Daftar Semua Tim (Cards Grid) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="team in masterTeams" :key="team.id">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-4">
+              <div class="space-y-3">
+                <!-- Team Header -->
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <div>
+                    <h3 class="font-extrabold text-base text-slate-900" x-text="team.name"></h3>
+                    <span class="text-[11px] text-slate-500 font-medium" x-text="team.members.length + ' anggota terdaftar'"></span>
+                  </div>
+                  <button
+                    type="button"
+                    @click="deleteMasterTeam(team.id)"
+                    title="Hapus Tim"
+                    class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition"
+                  >
+                    Hapus Tim
+                  </button>
+                </div>
+
+                <!-- Member List -->
+                <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  <div x-show="team.members.length === 0" class="text-xs text-slate-400 italic py-3 text-center">
+                    Belum ada anggota di tim ini.
+                  </div>
+                  <template x-for="m in team.members" :key="m.id">
+                    <div class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold border"
+                          :class="m.gender === 'male' ? 'bg-sky-100 text-sky-700 border-sky-200' : 'bg-pink-100 text-pink-700 border-pink-200'"
+                          x-text="m.gender === 'male' ? '♂' : '♀'"
+                        ></span>
+                        <span class="text-xs font-bold text-slate-800" x-text="m.name"></span>
+                        <span
+                          class="text-[10px] px-1.5 py-0.2 rounded font-semibold"
+                          :class="m.gender === 'male' ? 'text-sky-700 bg-sky-50' : 'text-pink-700 bg-pink-50'"
+                          x-text="m.gender === 'male' ? 'Pria' : 'Wanita'"
+                        ></span>
+                      </div>
+                      <button
+                        type="button"
+                        @click="removeMemberFromMasterTeam(team.id, m.id)"
+                        class="text-slate-400 hover:text-rose-600 font-bold text-sm px-1"
+                        title="Hapus Anggota"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Form Tambah Anggota ke Tim Ini -->
+              <div class="pt-3 border-t border-slate-100 space-y-2" x-data="{ g: 'male', n: '' }">
+                <label class="block text-[11px] font-bold text-slate-600">Tambah Anggota ke <span x-text="team.name"></span>:</label>
+                <div class="flex items-center gap-1.5">
+                  <select
+                    x-model="newMemberInputs[team.id].gender"
+                    class="bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                  >
+                    <option value="male">♂ Pria</option>
+                    <option value="female">♀ Wanita</option>
+                  </select>
+                  <input
+                    type="text"
+                    x-model="newMemberInputs[team.id].name"
+                    @keydown.enter.prevent="addMemberToMasterTeam(team.id)"
+                    placeholder="Nama pemain..."
+                    class="flex-1 min-w-0 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-900 focus:border-emerald-600 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    @click="addMemberToMasterTeam(team.id)"
+                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition shrink-0"
+                  >
+                    + Tambah
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 3: LIVE MATCH & INTERACTIVE 2D COURT-->
+    <!-- ========================================== -->
+    <section x-show="screen === 'match'" x-transition.opacity class="space-y-3.5">
+
+      <!-- 1. TOP SCOREBOARD & STATUS BANNER (LIGHT MODE) -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-sm">
+        <!-- Status Pill (Deuce / Game Point / Golden Point) -->
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold border border-emerald-200">
+              SET <span x-text="match.currentSet"></span> / <span x-text="config.bestOf"></span>
+            </span>
+            <span class="text-slate-500 text-[11px]">
+              Target: <strong class="text-slate-900" x-text="config.targetPoints"></strong>
+              <span x-show="config.deuceEnabled">(Maks Deuce: <strong class="text-amber-600" x-text="config.maxCap"></strong>)</span>
+            </span>
+          </div>
+
+          <!-- Dynamic Alert Badge -->
+          <template x-if="matchStatusBadge">
+            <span
+              :class="matchStatusBadge.color"
+              class="px-3 py-0.5 rounded-full text-[11px] font-bold tracking-wide shadow-sm"
+              x-text="matchStatusBadge.text"
+            ></span>
+          </template>
+
+          <!-- Set Score History Pills -->
+          <div class="flex items-center gap-1.5" x-show="match.setScoresHistory.length > 0">
+            <span class="text-[11px] text-slate-500">Riwayat Set:</span>
+            <template x-for="sh in match.setScoresHistory" :key="sh.set">
+              <span class="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-mono font-bold text-slate-800 border border-slate-200">
+                S<span x-text="sh.set"></span>: <span x-text="sh.A"></span>-<span x-text="sh.B"></span>
+              </span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Scoreboard Grid (Left Court Team vs Right Court Team) -->
+        <div class="grid grid-cols-11 items-center gap-2">
+          <!-- LEFT SIDE TEAM SCORE -->
+          <div
+            class="col-span-5 rounded-xl p-3 border transition flex items-center justify-between"
+            :class="match.servingTeam === leftSideTeamKey ? 'bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-500/50' : 'bg-slate-50 border-slate-200'"
+          >
+            <div class="min-w-0 pr-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white text-slate-600 font-bold border border-slate-200">
+                  Lapangan Kiri
+                </span>
+                <span
+                  x-show="match.servingTeam === leftSideTeamKey"
+                  class="text-[10px] px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold flex items-center gap-1 shadow-sm"
+                >
+                  🏸 SERVIS
+                </span>
+              </div>
+              <h3 class="font-extrabold text-sm sm:text-lg text-slate-900 truncate mt-1" x-text="getTeamName(leftSideTeamKey)"></h3>
+              <p class="text-[11px] text-slate-600 font-medium truncate">
+                ♂ <span x-text="getPlayerObj(leftSideTeamKey, 'male').name"></span> &
+                ♀ <span x-text="getPlayerObj(leftSideTeamKey, 'female').name"></span>
+              </p>
+            </div>
+            <div class="text-right shrink-0 flex items-center gap-2">
+              <div class="flex flex-col items-center">
+                <span class="text-[10px] text-slate-500 uppercase font-bold">Set</span>
+                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-xs font-extrabold text-emerald-700" x-text="match.setsWon[leftSideTeamKey]"></span>
+              </div>
+              <div
+                class="text-4xl sm:text-5xl font-black tracking-tight px-2"
+                :class="match.servingTeam === leftSideTeamKey ? 'text-emerald-700' : 'text-slate-900'"
+                x-text="match.scores[leftSideTeamKey]"
+              ></div>
+            </div>
+          </div>
+
+          <!-- VS CENTER -->
+          <div class="col-span-1 flex flex-col items-center justify-center">
+            <span class="text-xs font-black text-slate-400">VS</span>
+            <button
+              type="button"
+              @click="switchCourtSidesManual()"
+              title="Tukar Sisi Lapangan Kiri & Kanan"
+              class="mt-1 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-300 transition"
+            >
+              ⇄
+            </button>
+          </div>
+
+          <!-- RIGHT SIDE TEAM SCORE -->
+          <div
+            class="col-span-5 rounded-xl p-3 border transition flex items-center justify-between flex-row-reverse sm:flex-row"
+            :class="match.servingTeam === rightSideTeamKey ? 'bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-500/50' : 'bg-slate-50 border-slate-200'"
+          >
+            <div class="text-left shrink-0 flex items-center gap-2">
+              <div
+                class="text-4xl sm:text-5xl font-black tracking-tight px-2"
+                :class="match.servingTeam === rightSideTeamKey ? 'text-emerald-700' : 'text-slate-900'"
+                x-text="match.scores[rightSideTeamKey]"
+              ></div>
+              <div class="flex flex-col items-center">
+                <span class="text-[10px] text-slate-500 uppercase font-bold">Set</span>
+                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-xs font-extrabold text-emerald-700" x-text="match.setsWon[rightSideTeamKey]"></span>
+              </div>
+            </div>
+            <div class="min-w-0 pl-2 text-right">
+              <div class="flex items-center justify-end gap-1.5">
+                <span
+                  x-show="match.servingTeam === rightSideTeamKey"
+                  class="text-[10px] px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold flex items-center gap-1 shadow-sm"
+                >
+                  🏸 SERVIS
+                </span>
+                <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white text-slate-600 font-bold border border-slate-200">
+                  Lapangan Kanan
+                </span>
+              </div>
+              <h3 class="font-extrabold text-sm sm:text-lg text-slate-900 truncate mt-1" x-text="getTeamName(rightSideTeamKey)"></h3>
+              <p class="text-[11px] text-slate-600 font-medium truncate">
+                ♂ <span x-text="getPlayerObj(rightSideTeamKey, 'male').name"></span> &
+                ♀ <span x-text="getPlayerObj(rightSideTeamKey, 'female').name"></span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. INTERACTIVE 2D BADMINTON COURT VISUALIZATION -->
+      <div class="badminton-court rounded-2xl p-2 sm:p-4 relative">
+        <!-- Court Outer Lines & Grid -->
+        <div class="relative w-full aspect-[16/10] sm:aspect-[20/10] max-h-[410px] border-2 border-white grid grid-cols-2">
+
+          <!-- Diagonal Service Arrow Overlay (SVG) -->
+          <svg
+            x-show="!match.isFinished"
+            class="absolute inset-0 w-full h-full pointer-events-none z-20"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <polygon points="0 0, 6 3, 0 6" fill="#fde047" />
+              </marker>
+            </defs>
+            <line
+              :x1="serviceArrowCoords.x1"
+              :y1="serviceArrowCoords.y1"
+              :x2="serviceArrowCoords.x2"
+              :y2="serviceArrowCoords.y2"
+              stroke="#fde047"
+              stroke-width="1.3"
+              class="service-arrow-line"
+              marker-end="url(#arrowhead)"
+            />
+          </svg>
+
+          <!-- CENTER NET LINE -->
+          <div class="court-net absolute left-1/2 top-0 bottom-0 w-1.5 -translate-x-1/2 z-10 flex items-center justify-center">
+            <span class="bg-white text-slate-900 border border-slate-300 shadow text-[9px] font-black px-1.5 py-0.5 rounded rotate-90 tracking-widest">
+              NET
+            </span>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- LEFT HALF OF COURT                         -->
+          <!-- ========================================== -->
+          <div class="grid grid-rows-2 border-r border-white/60 relative">
+            <!-- TOP-LEFT QUADRANT: Kotak Kiri (Ganjil) milik Tim Kiri -->
+            <template x-for="q in [getCourtQuadrantInfo('top-left')]" :key="'tl-' + q.player.role + '-' + q.isServer">
+              <div
+                class="border-b border-white/90 p-2 sm:p-3 flex flex-col justify-between relative transition"
+                :class="{
+                  'court-box-server': q.isServer,
+                  'court-box-receiver': q.isReceiver
+                }"
+              >
+                <div class="flex items-center justify-between text-[10px] sm:text-xs font-bold text-white">
+                  <span class="bg-black/30 px-2 py-0.5 rounded" x-text="q.boxLabel"></span>
+                  <span class="text-white/90 hidden sm:inline" x-text="q.teamName"></span>
+                </div>
+
+                <!-- Player Avatar Card (Light Card on Green Court) -->
+                <div
+                  class="player-card my-auto mx-auto w-full max-w-[215px] rounded-xl p-2 sm:p-2.5 bg-white border-2 shadow-lg flex items-center justify-between gap-2"
+                  :class="[
+                    q.isServer ? 'border-amber-400 server-pulse' : (q.isReceiver ? 'border-sky-400' : 'border-white'),
+                    match.lastSwappedTeam === q.teamKey ? 'player-card-swapped' : ''
+                  ]"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div
+                      class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-black text-base border shrink-0"
+                      :class="q.player.badgeClass"
+                      x-text="q.player.genderIcon"
+                    ></div>
+                    <div class="min-w-0">
+                      <div class="font-extrabold text-xs sm:text-sm text-slate-900 truncate" x-text="q.player.name"></div>
+                      <div class="text-[10px] text-slate-500 font-medium" x-text="q.shortBoxLabel"></div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">
+                    <span x-show="q.isServer" class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] block shadow-sm">
+                      🏸 SERVER
+                    </span>
+                    <span x-show="q.isReceiver" class="px-2 py-0.5 rounded bg-sky-500 text-white font-black text-[10px] block shadow-sm">
+                      🎯 RECEIVER
+                    </span>
+                  </div>
+                </div>
+
+                <div class="text-[10px] text-white/85 font-medium flex justify-between items-center">
+                  <span>Skor Ganjil (1, 3, 5...)</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- BOTTOM-LEFT QUADRANT: Kotak Kanan (Genap) milik Tim Kiri -->
+            <template x-for="q in [getCourtQuadrantInfo('bottom-left')]" :key="'bl-' + q.player.role + '-' + q.isServer">
+              <div
+                class="border-t border-white/90 p-2 sm:p-3 flex flex-col justify-between relative transition"
+                :class="{
+                  'court-box-server': q.isServer,
+                  'court-box-receiver': q.isReceiver
+                }"
+              >
+                <div class="flex items-center justify-between text-[10px] sm:text-xs font-bold text-white">
+                  <span class="bg-black/30 px-2 py-0.5 rounded" x-text="q.boxLabel"></span>
+                  <span class="text-white/90 hidden sm:inline" x-text="q.teamName"></span>
+                </div>
+
+                <!-- Player Avatar Card -->
+                <div
+                  class="player-card my-auto mx-auto w-full max-w-[215px] rounded-xl p-2 sm:p-2.5 bg-white border-2 shadow-lg flex items-center justify-between gap-2"
+                  :class="[
+                    q.isServer ? 'border-amber-400 server-pulse' : (q.isReceiver ? 'border-sky-400' : 'border-white'),
+                    match.lastSwappedTeam === q.teamKey ? 'player-card-swapped' : ''
+                  ]"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div
+                      class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-black text-base border shrink-0"
+                      :class="q.player.badgeClass"
+                      x-text="q.player.genderIcon"
+                    ></div>
+                    <div class="min-w-0">
+                      <div class="font-extrabold text-xs sm:text-sm text-slate-900 truncate" x-text="q.player.name"></div>
+                      <div class="text-[10px] text-slate-500 font-medium" x-text="q.shortBoxLabel"></div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">
+                    <span x-show="q.isServer" class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] block shadow-sm">
+                      🏸 SERVER
+                    </span>
+                    <span x-show="q.isReceiver" class="px-2 py-0.5 rounded bg-sky-500 text-white font-black text-[10px] block shadow-sm">
+                      🎯 RECEIVER
+                    </span>
+                  </div>
+                </div>
+
+                <div class="text-[10px] text-white/85 font-medium flex justify-between items-center">
+                  <span>Skor Genap (0, 2, 4...)</span>
+                  <button
+                    type="button"
+                    @click="swapTeamPlayersManual(leftSideTeamKey)"
+                    class="text-[10px] bg-white/90 hover:bg-white text-slate-900 font-bold px-2 py-0.5 rounded shadow transition"
+                  >
+                    ⇅ Tukar Posisi <span x-text="getTeamName(leftSideTeamKey)"></span>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- RIGHT HALF OF COURT                        -->
+          <!-- ========================================== -->
+          <div class="grid grid-rows-2 border-l border-white/60 relative">
+            <!-- TOP-RIGHT QUADRANT: Kotak Kanan (Genap) milik Tim Kanan -->
+            <template x-for="q in [getCourtQuadrantInfo('top-right')]" :key="'tr-' + q.player.role + '-' + q.isServer">
+              <div
+                class="border-b border-white/90 p-2 sm:p-3 flex flex-col justify-between relative transition"
+                :class="{
+                  'court-box-server': q.isServer,
+                  'court-box-receiver': q.isReceiver
+                }"
+              >
+                <div class="flex items-center justify-between text-[10px] sm:text-xs font-bold text-white">
+                  <span class="text-white/90 hidden sm:inline" x-text="q.teamName"></span>
+                  <span class="bg-black/30 px-2 py-0.5 rounded ml-auto" x-text="q.boxLabel"></span>
+                </div>
+
+                <!-- Player Avatar Card -->
+                <div
+                  class="player-card my-auto mx-auto w-full max-w-[215px] rounded-xl p-2 sm:p-2.5 bg-white border-2 shadow-lg flex items-center justify-between gap-2"
+                  :class="[
+                    q.isServer ? 'border-amber-400 server-pulse' : (q.isReceiver ? 'border-sky-400' : 'border-white'),
+                    match.lastSwappedTeam === q.teamKey ? 'player-card-swapped' : ''
+                  ]"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div
+                      class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-black text-base border shrink-0"
+                      :class="q.player.badgeClass"
+                      x-text="q.player.genderIcon"
+                    ></div>
+                    <div class="min-w-0">
+                      <div class="font-extrabold text-xs sm:text-sm text-slate-900 truncate" x-text="q.player.name"></div>
+                      <div class="text-[10px] text-slate-500 font-medium" x-text="q.shortBoxLabel"></div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">
+                    <span x-show="q.isServer" class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] block shadow-sm">
+                      🏸 SERVER
+                    </span>
+                    <span x-show="q.isReceiver" class="px-2 py-0.5 rounded bg-sky-500 text-white font-black text-[10px] block shadow-sm">
+                      🎯 RECEIVER
+                    </span>
+                  </div>
+                </div>
+
+                <div class="text-[10px] text-white/85 font-medium flex justify-end items-center">
+                  <span>Skor Genap (0, 2, 4...)</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- BOTTOM-RIGHT QUADRANT: Kotak Kiri (Ganjil) milik Tim Kanan -->
+            <template x-for="q in [getCourtQuadrantInfo('bottom-right')]" :key="'br-' + q.player.role + '-' + q.isServer">
+              <div
+                class="border-t border-white/90 p-2 sm:p-3 flex flex-col justify-between relative transition"
+                :class="{
+                  'court-box-server': q.isServer,
+                  'court-box-receiver': q.isReceiver
+                }"
+              >
+                <div class="flex items-center justify-between text-[10px] sm:text-xs font-bold text-white">
+                  <span class="text-white/90 hidden sm:inline" x-text="q.teamName"></span>
+                  <span class="bg-black/30 px-2 py-0.5 rounded ml-auto" x-text="q.boxLabel"></span>
+                </div>
+
+                <!-- Player Avatar Card -->
+                <div
+                  class="player-card my-auto mx-auto w-full max-w-[215px] rounded-xl p-2 sm:p-2.5 bg-white border-2 shadow-lg flex items-center justify-between gap-2"
+                  :class="[
+                    q.isServer ? 'border-amber-400 server-pulse' : (q.isReceiver ? 'border-sky-400' : 'border-white'),
+                    match.lastSwappedTeam === q.teamKey ? 'player-card-swapped' : ''
+                  ]"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div
+                      class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-black text-base border shrink-0"
+                      :class="q.player.badgeClass"
+                      x-text="q.player.genderIcon"
+                    ></div>
+                    <div class="min-w-0">
+                      <div class="font-extrabold text-xs sm:text-sm text-slate-900 truncate" x-text="q.player.name"></div>
+                      <div class="text-[10px] text-slate-500 font-medium" x-text="q.shortBoxLabel"></div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">
+                    <span x-show="q.isServer" class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px] block shadow-sm">
+                      🏸 SERVER
+                    </span>
+                    <span x-show="q.isReceiver" class="px-2 py-0.5 rounded bg-sky-500 text-white font-black text-[10px] block shadow-sm">
+                      🎯 RECEIVER
+                    </span>
+                  </div>
+                </div>
+
+                <div class="text-[10px] text-white/85 font-medium flex justify-between items-center">
+                  <button
+                    type="button"
+                    @click="swapTeamPlayersManual(rightSideTeamKey)"
+                    class="text-[10px] bg-white/90 hover:bg-white text-slate-900 font-bold px-2 py-0.5 rounded shadow transition"
+                  >
+                    ⇅ Tukar Posisi <span x-text="getTeamName(rightSideTeamKey)"></span>
+                  </button>
+                  <span>Skor Ganjil (1, 3, 5...)</span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. UMPIRE SCORING CONTROLS (+1 POIN BUTTONS & UNDO) -->
+      <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+        <!-- +1 Point Left Side Team -->
+        <button
+          type="button"
+          :disabled="match.isFinished"
+          @click="addPoint(leftSideTeamKey)"
+          class="sm:col-span-5 py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black shadow-md shadow-emerald-600/20 transition transform active:scale-[0.98] flex items-center justify-between"
+        >
+          <div class="text-left">
+            <div class="text-[11px] uppercase tracking-wider font-bold text-emerald-100">Tambah Poin Lapangan Kiri</div>
+            <div class="text-lg sm:text-xl truncate" x-text="'+1 ' + getTeamName(leftSideTeamKey)"></div>
+          </div>
+          <span class="text-2xl font-black bg-white/20 w-11 h-11 rounded-xl flex items-center justify-center">+1</span>
+        </button>
+
+        <!-- Center Utility Controls (Undo / Koreksi) -->
+        <div class="sm:col-span-2 grid grid-cols-2 sm:grid-cols-1 gap-2">
+          <button
+            type="button"
+            :disabled="undoStack.length === 0"
+            @click="undoLastAction()"
+            class="py-2 px-3 rounded-xl bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-bold text-xs border border-slate-300 shadow-sm transition flex items-center justify-center gap-1.5"
+          >
+            <span>↩️</span>
+            <span>Undo (<span x-text="undoStack.length"></span>)</span>
+          </button>
+
+          <button
+            type="button"
+            @click="toggleServingTeamManual()"
+            class="py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-300 transition flex items-center justify-center gap-1"
+            title="Ubah hak servis manual tanpa menambah poin"
+          >
+            <span>🏸</span>
+            <span>Pindah Servis</span>
+          </button>
+        </div>
+
+        <!-- +1 Point Right Side Team -->
+        <button
+          type="button"
+          :disabled="match.isFinished"
+          @click="addPoint(rightSideTeamKey)"
+          class="sm:col-span-5 py-3.5 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black shadow-md shadow-indigo-600/20 transition transform active:scale-[0.98] flex items-center justify-between"
+        >
+          <div class="text-left">
+            <div class="text-[11px] uppercase tracking-wider font-bold text-indigo-100">Tambah Poin Lapangan Kanan</div>
+            <div class="text-lg sm:text-xl truncate" x-text="'+1 ' + getTeamName(rightSideTeamKey)"></div>
+          </div>
+          <span class="text-2xl font-black bg-white/20 w-11 h-11 rounded-xl flex items-center justify-center">+1</span>
+        </button>
+      </div>
+
+      <!-- 4. RALLY LOGS & QUICK RESET -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="w-full sm:w-auto flex-1">
+          <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Riwayat Reli Terakhir:</h4>
+          <div x-show="match.pointLogs.length === 0" class="text-xs text-slate-400 italic">
+            Belum ada poin tercipta di pertandingan ini.
+          </div>
+          <div class="flex gap-2 overflow-x-auto pb-1" x-show="match.pointLogs.length > 0">
+            <template x-for="log in match.pointLogs.slice(0, 6)" :key="log.id">
+              <div class="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 shrink-0 text-xs">
+                <div class="font-bold text-slate-800" x-text="log.summary"></div>
+                <div class="text-[10px] text-slate-500">Servis berikut: <span class="text-emerald-700 font-semibold" x-text="log.nextServe"></span></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          @click="resetToSetup()"
+          class="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition shrink-0"
+        >
+          🔄 Reset / Pertandingan Baru
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 4: PANDUAN ATURAN RESMI BWF         -->
+    <!-- ========================================== -->
+    <section x-show="screen === 'rules'" x-transition.opacity class="space-y-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+        <div class="border-b border-slate-100 pb-4">
+          <h2 class="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
+            <span>📖</span> Panduan Lengkap Aturan Badminton Ganda & Ganda Campuran (BWF)
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1">
+            Dirancang khusus agar pemain pemula maupun wasit memahami kapan harus pindah kotak dan kapan tetap di tempat.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+            <div class="text-emerald-700 font-extrabold text-sm flex items-center gap-2">
+              <span>1️⃣</span> Rumus Emas: Genap = Kanan, Ganjil = Kiri
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Lihatlah <strong>skor tim yang sedang memegang servis</strong> (bukan skor lawan):
+            </p>
+            <ul class="text-xs text-slate-700 list-disc list-inside space-y-1">
+              <li>Skor <strong>0, 2, 4, 6, 8... (Genap)</strong>: Servis WAJIB dilakukan dari <strong>Kotak Kanan</strong>.</li>
+              <li>Skor <strong>1, 3, 5, 7, 9... (Ganjil)</strong>: Servis WAJIB dilakukan dari <strong>Kotak Kiri</strong>.</li>
+              <li>Penerima servis adalah pemain lawan yang berdiri di kotak <strong>diagonal berseberangan</strong>.</li>
+            </ul>
+          </div>
+
+          <div class="bg-amber-50/60 border border-amber-200 rounded-xl p-4 space-y-2">
+            <div class="text-amber-800 font-extrabold text-sm flex items-center gap-2">
+              <span>2️⃣</span> Kapan Pemain Bertukar Posisi (Kanan ↔ Kiri)?
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Kesalahan paling umum orang awam adalah selalu tukar posisi setiap dapat poin. Aturan resminya:
+            </p>
+            <ul class="text-xs text-slate-700 list-disc list-inside space-y-1">
+              <li>
+                <strong class="text-amber-900">TUKAR POSISI:</strong> HANYA JIKA tim Anda <strong>memenangkan poin SAAT TIM ANDA SEDANG MEMEGANG SERVIS</strong>. Orang yang sama lanjut melakukan servis dari kotak sebelahnya.
+              </li>
+              <li>
+                <strong class="text-sky-800">POSISI TETAP (JANGAN TUKAR):</strong> Saat tim Anda <strong>merebut servis dari lawan (Pindah Bola / Service Over)</strong>. Anda dapat +1 poin, tapi kedua pemain <strong>TETAP berdiri di kotak terakhirnya</strong>!
+              </li>
+            </ul>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+            <div class="text-sky-700 font-extrabold text-sm flex items-center gap-2">
+              <span>3️⃣</span> Aturan Poin Maksimal & Deuce Kustom (+3 Poin)
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Aplikasi ini mendukung standar BWF maupun pengaturan poin kustom wasit:
+            </p>
+            <ul class="text-xs text-slate-700 list-disc list-inside space-y-1">
+              <li><strong>Standar BWF (21 Poin):</strong> Deuce pada 20-20 (harus selisih 2 poin), batas maksimal mentok di <strong>30 poin</strong> (29-29 → 30 menang).</li>
+              <li><strong>Kustom Wasit (Misal 15 Poin):</strong> Deuce terjadi pada <strong>14-14</strong> (selisih 2 poin), dengan batas maksimal Deuce +3 poin yaitu <strong>18 poin</strong> (17-17 → 18 menang).</li>
+            </ul>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+            <div class="text-pink-700 font-extrabold text-sm flex items-center gap-2">
+              <span>4️⃣</span> Interval Istirahat & Pindah Sisi Lapangan
+            </div>
+            <ul class="text-xs text-slate-700 list-disc list-inside space-y-1 leading-relaxed">
+              <li><strong>Interval Paruh Set:</strong> Saat skor tertinggi mencapai nilai tengah set (poin 11 pada game 21, atau poin 8 pada game 15), pemain berhak istirahat 60 detik.</li>
+              <li><strong>Pindah Sisi Lapangan:</strong> Dilakukan setiap selesai 1 set, dan khusus pada <strong>Set ke-3 (Rubber Game)</strong> dilakukan saat salah satu tim mencapai poin Interval.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 5: RIWAYAT PERTANDINGAN             -->
+    <!-- ========================================== -->
+    <section x-show="screen === 'history'" x-transition.opacity class="space-y-4">
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="font-extrabold text-base text-slate-900">🕒 Riwayat Pertandingan Selesai</h2>
+            <p class="text-xs text-slate-500">Tersimpan otomatis beserta susunan pemain di setiap set</p>
+          </div>
+          <button
+            x-show="matchHistory.length > 0"
+            @click="clearHistory()"
+            class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold"
+          >
+            Hapus Semua
+          </button>
+        </div>
+
+        <div x-show="matchHistory.length === 0" class="py-12 text-center text-slate-400 text-sm">
+          Belum ada riwayat pertandingan yang selesai.
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3" x-show="matchHistory.length > 0">
+          <template x-for="item in matchHistory" :key="item.id">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
+              <div class="flex items-center justify-between text-[11px] text-slate-500">
+                <span x-text="item.date"></span>
+                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 font-semibold">
+                  Target <span x-text="item.targetPoints"></span> (Maks <span x-text="item.maxCap"></span>)
+                </span>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <div>
+                  <div class="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
+                    <span x-text="item.teamAName"></span>
+                    <span x-show="item.winnerTeam === 'A'" class="text-amber-500">🏆</span>
+                  </div>
+                </div>
+                <div class="text-xl font-black text-emerald-600 px-3">
+                  <span x-text="item.setsWon.A"></span> - <span x-text="item.setsWon.B"></span>
+                </div>
+                <div class="text-right">
+                  <div class="font-extrabold text-sm text-slate-900 flex items-center justify-end gap-1.5">
+                    <span x-show="item.winnerTeam === 'B'" class="text-amber-500">🏆</span>
+                    <span x-text="item.teamBName"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="space-y-1.5 pt-2 border-t border-slate-200 text-[11px]">
+                <template x-for="s in item.setScores" :key="s.set">
+                  <div class="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between gap-2">
+                    <span class="font-bold text-emerald-700 shrink-0">Set <span x-text="s.set"></span> (<span x-text="s.A"></span>-<span x-text="s.B"></span>)</span>
+                    <span class="text-slate-600 truncate text-right" x-show="s.playersA && s.playersB">
+                      <span x-text="s.playersA"></span> <span class="text-slate-400">vs</span> <span x-text="s.playersB"></span>
+                    </span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL 1: INTERVAL PARUH SET & RUBBER SWITCH-->
+  <!-- ========================================== -->
+  <div
+    x-show="modals.interval.open"
+    x-transition.opacity
+    class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+    style="display: none;"
+  >
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 space-y-4 text-center shadow-2xl">
+      <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-3xl flex items-center justify-center mx-auto">
+        ⏱️
+      </div>
+      <h3 class="text-lg font-black text-slate-900" x-text="modals.interval.title"></h3>
+      <p class="text-xs text-slate-600 leading-relaxed" x-text="modals.interval.message"></p>
+
+      <div x-show="modals.interval.needSideSwitch" class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">
+        ⇄ Sisi lapangan di layar telah otomatis ditukar untuk paruh kedua Set Penentu!
+      </div>
+
+      <!-- 60s Countdown -->
+      <div class="py-3 bg-slate-50 rounded-xl border border-slate-200">
+        <div class="text-[11px] text-slate-500 uppercase font-bold">Waktu Istirahat Interval</div>
+        <div class="text-4xl font-black text-emerald-600 font-mono mt-1">
+          <span x-text="modals.interval.timerSeconds"></span>s
+        </div>
+      </div>
+
+      <button
+        type="button"
+        @click="closeIntervalModal()"
+        class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-sm transition"
+      >
+        Lanjutkan Permainan
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 2: SET SELESAI & ROTASI PEMAIN BARU  -->
+  <!-- ========================================== -->
+  <div
+    x-show="modals.setEnd.open"
+    x-transition.opacity
+    class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    style="display: none;"
+  >
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 shadow-2xl my-auto">
+      <div class="text-center space-y-1">
+        <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-extrabold">
+          SET <span x-text="modals.setEnd.setNumber"></span> SELESAI
+        </span>
+        <h3 class="text-lg sm:text-xl font-black text-slate-900 pt-1">
+          Dimenangkan oleh <span class="text-emerald-600" x-text="getTeamName(modals.setEnd.winnerTeam)"></span>!
+          (<span class="text-amber-600" x-text="modals.setEnd.scoreA + ' - ' + modals.setEnd.scoreB"></span>)
+        </h3>
+        <p class="text-xs text-slate-500">
+          Kedua tim otomatis <strong>bertukar sisi lapangan</strong>. Silakan pilih anggota tim yang akan bermain di <strong>Set <span x-text="modals.setEnd.setNumber + 1"></span></strong>:
+        </p>
+      </div>
+
+      <!-- PLAYER ROTATION / SUBSTITUTION FOR NEXT SET -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+
+        <!-- TEAM A NEXT SET LINEUP -->
+        <div class="bg-slate-50 border border-emerald-200 rounded-xl p-3.5 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <span class="font-extrabold text-emerald-700 text-sm" x-text="getTeamName('A')"></span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold">Set <span x-text="modals.setEnd.setNumber + 1"></span></span>
+          </div>
+
+          <!-- Quick Pick Chips from Team A Master Roster -->
+          <div x-show="getTeamMembersList('A').length > 0" class="space-y-1.5">
+            <div class="text-[10px] text-slate-600 font-bold">Klik Anggota <span x-text="getTeamName('A')"></span>:</div>
+            <div class="flex flex-wrap gap-1.5">
+              <template x-for="m in getTeamMembersList('A')" :key="'rotA-' + m.id">
+                <button
+                  type="button"
+                  @click="selectMemberForNextSet('A', m)"
+                  :class="(m.gender === 'male' && modals.setEnd.nextSetTeamAMale === m.name) || (m.gender === 'female' && modals.setEnd.nextSetTeamAFemale === m.name)
+                    ? (m.gender === 'male' ? 'bg-sky-600 border-sky-600 text-white font-bold shadow-sm' : 'bg-pink-600 border-pink-600 text-white font-bold shadow-sm')
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'"
+                  class="px-2.5 py-1 rounded-lg border text-[11px] flex items-center gap-1 transition"
+                >
+                  <span x-text="m.gender === 'male' ? '♂' : '♀'"></span>
+                  <span x-text="m.name"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Input Male & Female for Team A -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-sky-700 font-bold mb-1">♂ Pemain Pria</label>
+              <input
+                type="text"
+                x-model="modals.setEnd.nextSetTeamAMale"
+                placeholder="Nama Pria A"
+                class="w-full bg-white border border-sky-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-sky-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] text-pink-700 font-bold mb-1">♀ Pemain Wanita</label>
+              <input
+                type="text"
+                x-model="modals.setEnd.nextSetTeamAFemale"
+                placeholder="Nama Wanita A"
+                class="w-full bg-white border border-pink-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-pink-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <!-- Who stands in Right Box (Score 0) for Team A -->
+          <div class="pt-2 border-t border-slate-200">
+            <div class="text-[10px] text-slate-600 font-semibold mb-1.5">Posisi Kotak Kanan (Skor 0-0):</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                @click="modals.setEnd.nextSetTeamAFirstRight = 'male'"
+                :class="modals.setEnd.nextSetTeamAFirstRight === 'male' ? 'bg-sky-600 border-sky-600 text-white font-bold' : 'bg-white border-slate-200 text-slate-600'"
+                class="py-1.5 px-2 rounded-lg border text-[11px] truncate"
+              >
+                ♂ <span x-text="modals.setEnd.nextSetTeamAMale || 'Pria A'"></span>
+              </button>
+              <button
+                type="button"
+                @click="modals.setEnd.nextSetTeamAFirstRight = 'female'"
+                :class="modals.setEnd.nextSetTeamAFirstRight === 'female' ? 'bg-pink-600 border-pink-600 text-white font-bold' : 'bg-white border-slate-200 text-slate-600'"
+                class="py-1.5 px-2 rounded-lg border text-[11px] truncate"
+              >
+                ♀ <span x-text="modals.setEnd.nextSetTeamAFemale || 'Wanita A'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TEAM B NEXT SET LINEUP -->
+        <div class="bg-slate-50 border border-indigo-200 rounded-xl p-3.5 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <span class="font-extrabold text-indigo-700 text-sm" x-text="getTeamName('B')"></span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold">Set <span x-text="modals.setEnd.setNumber + 1"></span></span>
+          </div>
+
+          <!-- Quick Pick Chips from Team B Master Roster -->
+          <div x-show="getTeamMembersList('B').length > 0" class="space-y-1.5">
+            <div class="text-[10px] text-slate-600 font-bold">Klik Anggota <span x-text="getTeamName('B')"></span>:</div>
+            <div class="flex flex-wrap gap-1.5">
+              <template x-for="m in getTeamMembersList('B')" :key="'rotB-' + m.id">
+                <button
+                  type="button"
+                  @click="selectMemberForNextSet('B', m)"
+                  :class="(m.gender === 'male' && modals.setEnd.nextSetTeamBMale === m.name) || (m.gender === 'female' && modals.setEnd.nextSetTeamBFemale === m.name)
+                    ? (m.gender === 'male' ? 'bg-sky-600 border-sky-600 text-white font-bold shadow-sm' : 'bg-pink-600 border-pink-600 text-white font-bold shadow-sm')
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'"
+                  class="px-2.5 py-1 rounded-lg border text-[11px] flex items-center gap-1 transition"
+                >
+                  <span x-text="m.gender === 'male' ? '♂' : '♀'"></span>
+                  <span x-text="m.name"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Input Male & Female for Team B -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-sky-700 font-bold mb-1">♂ Pemain Pria</label>
+              <input
+                type="text"
+                x-model="modals.setEnd.nextSetTeamBMale"
+                placeholder="Nama Pria B"
+                class="w-full bg-white border border-sky-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-sky-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] text-pink-700 font-bold mb-1">♀ Pemain Wanita</label>
+              <input
+                type="text"
+                x-model="modals.setEnd.nextSetTeamBFemale"
+                placeholder="Nama Wanita B"
+                class="w-full bg-white border border-pink-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:border-pink-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <!-- Who stands in Right Box (Score 0) for Team B -->
+          <div class="pt-2 border-t border-slate-200">
+            <div class="text-[10px] text-slate-600 font-semibold mb-1.5">Posisi Kotak Kanan (Skor 0-0):</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                @click="modals.setEnd.nextSetTeamBFirstRight = 'male'"
+                :class="modals.setEnd.nextSetTeamBFirstRight === 'male' ? 'bg-sky-600 border-sky-600 text-white font-bold' : 'bg-white border-slate-200 text-slate-600'"
+                class="py-1.5 px-2 rounded-lg border text-[11px] truncate"
+              >
+                ♂ <span x-text="modals.setEnd.nextSetTeamBMale || 'Pria B'"></span>
+              </button>
+              <button
+                type="button"
+                @click="modals.setEnd.nextSetTeamBFirstRight = 'female'"
+                :class="modals.setEnd.nextSetTeamBFirstRight === 'female' ? 'bg-pink-600 border-pink-600 text-white font-bold' : 'bg-white border-slate-200 text-slate-600'"
+                class="py-1.5 px-2 rounded-lg border text-[11px] truncate"
+              >
+                ♀ <span x-text="modals.setEnd.nextSetTeamBFemale || 'Wanita B'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button
+          type="button"
+          @click="undoLastAction()"
+          class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+        >
+          ↩️ Batal Poin Terakhir
+        </button>
+        <button
+          type="button"
+          @click="startNextSet()"
+          class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-sm transition shadow-sm"
+        >
+          Mulai Set <span x-text="modals.setEnd.setNumber + 1"></span> →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 3: PERTANDINGAN SELESAI (WINNER)     -->
+  <!-- ========================================== -->
+  <div
+    x-show="modals.matchEnd.open"
+    x-transition.opacity
+    class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+    style="display: none;"
+  >
+    <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 space-y-5 text-center shadow-2xl">
+      <div class="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-4xl flex items-center justify-center mx-auto">
+        🏆
+      </div>
+      <div>
+        <span class="text-xs font-extrabold uppercase tracking-widest text-emerald-600">Pemenang Pertandingan</span>
+        <h3 class="text-2xl font-black text-slate-900 mt-1" x-text="getTeamName(match.winnerTeam)"></h3>
+      </div>
+
+      <!-- Set Breakdown with Players per Set -->
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-left">
+        <div class="text-xs font-bold text-slate-500 text-center">
+          Hasil Akhir Set (<span class="text-slate-900 font-black" x-text="match.setsWon.A + ' - ' + match.setsWon.B"></span>)
+        </div>
+        <div class="space-y-1.5">
+          <template x-for="s in match.setScoresHistory" :key="s.set">
+            <div class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs">
+              <div class="flex items-center justify-between font-bold text-slate-900">
+                <span>Set <span x-text="s.set"></span></span>
+                <span>
+                  <span class="text-emerald-600" x-text="s.A"></span> - <span class="text-indigo-600" x-text="s.B"></span>
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5" x-show="s.playersA && s.playersB">
+                <span x-text="s.playersA"></span> vs <span x-text="s.playersB"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button
+          type="button"
+          @click="undoLastAction()"
+          class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+        >
+          ↩️ Undo
+        </button>
+        <button
+          type="button"
+          @click=" modals.matchEnd.open = false "
+          class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition"
+        >
+          Lihat Lapangan
+        </button>
+        <button
+          type="button"
+          @click="resetToSetup()"
+          class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-sm"
+        >
+          Pertandingan Baru
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Logic Script -->
+  <script src="js/app.js?v=4"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js?v=4').then((reg) => {
+          reg.update();
+        }).catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
