@@ -1,0 +1,14 @@
+---
+deployment:
+  tasks:
+    # Sesuaikan path DEPLOYPATH di bawah ini dengan folder domain/subdomain Anda di cPanel
+    # Contoh jika di subdomain skor.gfontimo.com: /home/USERNAME_CPANEL/public_html/skor
+    - export DEPLOYPATH=/home/$USER/public_html/scobad/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R index.html $DEPLOYPATH
+    - /bin/cp -R manifest.json $DEPLOYPATH
+    - /bin/cp -R sw.js $DEPLOYPATH
+    - /bin/cp -R css $DEPLOYPATH
+    - /bin/cp -R js $DEPLOYPATH
+    - /bin/cp -R assets $DEPLOYPATH
+
