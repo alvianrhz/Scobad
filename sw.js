@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skor-badminton-v4';
+const CACHE_NAME = 'skor-badminton-v5';
 const ASSETS = [
   './',
   './index.html',

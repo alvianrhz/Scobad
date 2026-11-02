@@ -3,51 +3,61 @@
  * Supports:
  * - BWF Official Rules + Custom Target Point & Deuce Cap (+3 default)
  * - Dedicated Master Teams & Squad Roster Database ('teams' screen)
+ * - Dynamic Tournament Bracket ('bracket' screen) with Knockout + 3rd Place Playoff (Juara 1, 2, 3)
  * - Quick Team & Player Selection in Setup & Between Sets
  */
 
 const STORAGE_KEY_ACTIVE = 'skor_badminton_active_v2';
 const STORAGE_KEY_HISTORY = 'skor_badminton_history_v2';
 const STORAGE_KEY_TEAMS = 'skor_badminton_master_teams_v1';
+const STORAGE_KEY_BRACKET = 'skor_badminton_bracket_v1';
 
 const DEFAULT_MASTER_TEAMS = [
   {
     id: 'team-1',
-    name: 'Tim Garuda',
+    name: 'Tim 1 Alpha',
     members: [
-      { id: 'm-1', name: 'Alvian', gender: 'male' },
-      { id: 'm-2', name: 'Ilmi', gender: 'female' },
-      { id: 'm-3', name: 'Budi', gender: 'male' },
-      { id: 'm-4', name: 'Siti', gender: 'female' },
-      { id: 'm-5', name: 'Rizky', gender: 'male' }
+      { id: 'm-1', name: 'Noval', gender: 'male' },
+      { id: 'm-2', name: 'Pak Turi', gender: 'male' },
+      { id: 'm-3', name: 'Muiz', gender: 'male' },
+      { id: 'm-4', name: 'Iwud', gender: 'female' }
     ]
   },
   {
     id: 'team-2',
-    name: 'Tim Rajawali',
+    name: 'Tim 2 Bravo',
     members: [
-      { id: 'm-6', name: 'Pak Turi', gender: 'male' },
-      { id: 'm-7', name: 'Iwud', gender: 'female' },
-      { id: 'm-8', name: 'Andi', gender: 'male' },
-      { id: 'm-9', name: 'Rina', gender: 'female' },
-      { id: 'm-10', name: 'Dimas', gender: 'male' }
+      { id: 'm-5', name: 'Alvian', gender: 'male' },
+      { id: 'm-6', name: 'Ilmi', gender: 'female' },
+      { id: 'm-7', name: 'Budi', gender: 'male' },
+      { id: 'm-8', name: 'Siti', gender: 'female' }
     ]
   },
   {
     id: 'team-3',
-    name: 'PB Cendrawasih',
+    name: 'Tim 3 Charlie',
     members: [
-      { id: 'm-11', name: 'Kevin', gender: 'male' },
-      { id: 'm-12', name: 'Liliyana', gender: 'female' },
-      { id: 'm-13', name: 'Fajar', gender: 'male' },
-      { id: 'm-14', name: 'Apriyani', gender: 'female' }
+      { id: 'm-9', name: 'Andi', gender: 'male' },
+      { id: 'm-10', name: 'Rina', gender: 'female' },
+      { id: 'm-11', name: 'Dimas', gender: 'male' },
+      { id: 'm-12', name: 'Ayu', gender: 'female' }
+    ]
+  },
+  {
+    id: 'team-4',
+    name: 'Tim 4 Delta',
+    members: [
+      { id: 'm-13', name: 'Kevin', gender: 'male' },
+      { id: 'm-14', name: 'Liliyana', gender: 'female' },
+      { id: 'm-15', name: 'Fajar', gender: 'male' },
+      { id: 'm-16', name: 'Apriyani', gender: 'female' }
     ]
   }
 ];
 
 function badmintonApp() {
   return {
-    // Navigation view: 'setup' | 'teams' | 'match' | 'rules' | 'history'
+    // Navigation view: 'setup' | 'teams' | 'bracket' | 'match' | 'rules' | 'history'
     screen: 'setup',
 
     // Sound / Umpire TTS
@@ -56,7 +66,18 @@ function badmintonApp() {
     // Master Teams Database (Managed on the 'teams' screen)
     masterTeams: [],
     newTeamNameInput: '',
-    newMemberInputs: {}, // { [teamId]: { name: '', gender: 'male' } }
+    newMemberInputs: {},
+
+    // Tournament Bracket State
+    bracket: {
+      isCreated: false,
+      title: 'Turnamen Badminton Ganda Campuran',
+      size: 4, // 4, 8, 16, 32
+      participantCount: 0,
+      rounds: [], // Array of rounds: [{ roundIndex, name, isSemiFinal, isFinal, matches: [...] }]
+      thirdPlaceMatch: null, // Special match for Semifinal losers (Perebutan Juara 3)
+      activeBracketMatchId: null // Tracks if current live match belongs to a bracket match
+    },
 
     // Setup Form Configuration
     config: {
@@ -67,20 +88,20 @@ function badmintonApp() {
       maxCap: 18,
       bestOf: 3, // 1 or 3 sets
       firstServerTeam: 'A', // 'A' or 'B'
-      teamAOnLeft: true, // Physical court side at start of Set 1
+      teamAOnLeft: true,
       teamA: {
         teamId: 'team-1',
-        name: 'Tim Garuda',
-        male: 'Alvian',
-        female: 'Ilmi',
-        initialRight: 'male' // Who stands in the RIGHT box (Even score 0) at start of set
+        name: 'Tim 1 Alpha',
+        male: 'Pak Turi',
+        female: 'Iwud',
+        initialRight: 'male'
       },
       teamB: {
         teamId: 'team-2',
-        name: 'Tim Rajawali',
-        male: 'Pak Turi',
-        female: 'Iwud',
-        initialRight: 'male' // Who stands in the RIGHT box (Even score 0) at start of set
+        name: 'Tim 2 Bravo',
+        male: 'Alvian',
+        female: 'Ilmi',
+        initialRight: 'male'
       }
     },
 
@@ -93,22 +114,18 @@ function badmintonApp() {
       setsWon: { A: 0, B: 0 },
       scores: { A: 0, B: 0 },
       setScoresHistory: [],
-      servingTeam: 'A', // 'A' or 'B'
+      servingTeam: 'A',
       teamAOnLeft: true,
-
-      // Current court positions for each team:
-      // rightBox = Even Box (Kotak Kanan dari perspektif tim menghadap net)
-      // leftBox  = Odd Box  (Kotak Kiri dari perspektif tim menghadap net)
       positions: {
         A: { rightBox: 'male', leftBox: 'female' },
         B: { rightBox: 'male', leftBox: 'female' }
       },
-
       lastSwappedTeam: null,
       lastActionType: 'START',
       pointLogs: [],
       intervalReachedInCurrentSet: false,
-      rubberSwitchReached: false
+      rubberSwitchReached: false,
+      bracketMatchId: null
     },
 
     // Undo Stack
@@ -148,6 +165,7 @@ function badmintonApp() {
     // Lifecycle Init
     init() {
       this.loadMasterTeams();
+      this.loadBracket();
       this.loadHistory();
       this.loadActiveMatch();
       this.ensureDistinctTeams();
@@ -235,6 +253,7 @@ function badmintonApp() {
     deleteMasterTeam(teamId) {
       this.masterTeams = this.masterTeams.filter((t) => t.id !== teamId);
       this.saveMasterTeams();
+      this.ensureDistinctTeams();
     },
 
     addMemberToMasterTeam(teamId) {
@@ -268,7 +287,6 @@ function badmintonApp() {
       this.saveMasterTeams();
     },
 
-    // Get members of a selected team for Setup / Set Rotation
     getTeamMembersList(sideKey) {
       const sideCfg = sideKey === 'A' ? this.config.teamA : this.config.teamB;
       const found = this.masterTeams.find(
@@ -277,15 +295,6 @@ function badmintonApp() {
       return found ? found.members : [];
     },
 
-    getTeamMaleMembers(sideKey) {
-      return this.getTeamMembersList(sideKey).filter((m) => m.gender === 'male');
-    },
-
-    getTeamFemaleMembers(sideKey) {
-      return this.getTeamMembersList(sideKey).filter((m) => m.gender === 'female');
-    },
-
-    // When user picks a team from dropdown in Setup
     onSelectTeamInSetup(sideKey, selectedTeamId) {
       const sideCfg = sideKey === 'A' ? this.config.teamA : this.config.teamB;
       const otherKey = sideKey === 'A' ? 'B' : 'A';
@@ -301,7 +310,6 @@ function badmintonApp() {
         sideCfg.female = females.length > 0 ? females[0].name : '';
       }
 
-      // Prevent Team A and Team B from having the same teamId
       if (selectedTeamId && otherCfg.teamId === selectedTeamId) {
         const alternative = this.masterTeams.find((t) => t.id !== selectedTeamId);
         if (alternative) {
@@ -315,7 +323,6 @@ function badmintonApp() {
       }
     },
 
-    // Quick-pick member in Setup
     selectMemberForSetup(sideKey, member) {
       const sideCfg = sideKey === 'A' ? this.config.teamA : this.config.teamB;
       if (member.gender === 'male') {
@@ -325,7 +332,6 @@ function badmintonApp() {
       }
     },
 
-    // Quick-pick member in Set-End Modal
     selectMemberForNextSet(sideKey, member) {
       if (sideKey === 'A') {
         if (member.gender === 'male') {
@@ -343,6 +349,320 @@ function badmintonApp() {
     },
 
     // ==========================================
+    // TOURNAMENT BRACKET ENGINE (KNOCKOUT + 3RD PLACE)
+    // ==========================================
+    loadBracket() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_BRACKET);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            this.bracket = { ...this.bracket, ...parsed };
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load bracket:', e);
+      }
+    },
+
+    saveBracket() {
+      try {
+        localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
+      } catch (e) {
+        console.warn('Failed to save bracket:', e);
+      }
+    },
+
+    // Generate Knockout Bracket based on registered masterTeams
+    generateBracket(shuffleTeams = true) {
+      if (this.masterTeams.length < 2) {
+        alert('Minimal harus ada 2 tim terdaftar di menu Daftar Tim untuk membuat Bracket!');
+        return;
+      }
+
+      // Copy registered teams
+      let teamsPool = this.masterTeams.map((t) => ({
+        id: t.id,
+        name: t.name
+      }));
+
+      if (shuffleTeams) {
+        for (let i = teamsPool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [teamsPool[i], teamsPool[j]] = [teamsPool[j], teamsPool[i]];
+        }
+      }
+
+      const n = teamsPool.length;
+      // Next power of 2 (minimum 2, e.g., 4, 8, 16, 32)
+      let size = 2;
+      while (size < n) {
+        size *= 2;
+      }
+
+      const totalRounds = Math.log2(size);
+      const rounds = [];
+
+      // Helper for round names
+      const getRoundTitle = (rIdx, totalR) => {
+        const remainingTeams = Math.pow(2, totalR - rIdx);
+        if (remainingTeams === 2) return 'FINAL (Perebutan Juara 1 & 2)';
+        if (remainingTeams === 4) return 'SEMIFINAL (4 Besar)';
+        if (remainingTeams === 8) return 'PEREMPAT FINAL (8 Besar)';
+        if (remainingTeams === 16) return 'BABAK 16 BESAR';
+        return `BABAK ${remainingTeams} BESAR`;
+      };
+
+      // Pair teams in Round 0 (distribute BYEs evenly so BYEs don't play each other)
+      const numMatchesR0 = size / 2;
+      const numByes = size - n;
+      const r0Matches = [];
+
+      let teamCursor = 0;
+      for (let m = 0; m < numMatchesR0; m++) {
+        const teamA = teamsPool[teamCursor++] || null;
+        let teamB = null;
+        // Put BYEs on the last `numByes` matches so those teams advance automatically
+        if (m < numMatchesR0 - numByes) {
+          teamB = teamsPool[teamCursor++] || null;
+        } else {
+          teamB = { id: 'BYE', name: 'BYE (Lolos Langsung)', isBye: true };
+        }
+
+        r0Matches.push({
+          id: `R0-M${m}`,
+          roundIndex: 0,
+          matchIndex: m,
+          label: `Match #${m + 1}`,
+          teamA,
+          teamB,
+          scoreA: null,
+          scoreB: null,
+          winnerId: null,
+          status: 'PENDING' // 'PENDING' | 'BYE' | 'FINISHED'
+        });
+      }
+
+      rounds.push({
+        roundIndex: 0,
+        name: getRoundTitle(0, totalRounds),
+        isSemiFinal: totalRounds - 0 === 2,
+        isFinal: totalRounds - 0 === 1,
+        matches: r0Matches
+      });
+
+      // Build subsequent rounds
+      for (let r = 1; r < totalRounds; r++) {
+        const matchCount = Math.pow(2, totalRounds - r - 1);
+        const rMatches = [];
+        for (let m = 0; m < matchCount; m++) {
+          rMatches.push({
+            id: `R${r}-M${m}`,
+            roundIndex: r,
+            matchIndex: m,
+            label:
+              r === totalRounds - 1
+                ? 'Grand Final'
+                : r === totalRounds - 2
+                ? `Semifinal ${m + 1}`
+                : `Match`,
+            teamA: null,
+            teamB: null,
+            scoreA: null,
+            scoreB: null,
+            winnerId: null,
+            status: 'PENDING'
+          });
+        }
+        rounds.push({
+          roundIndex: r,
+          name: getRoundTitle(r, totalRounds),
+          isSemiFinal: r === totalRounds - 2,
+          isFinal: r === totalRounds - 1,
+          matches: rMatches
+        });
+      }
+
+      // Create 3rd Place Playoff Match (Perebutan Juara 3) if tournament has Semifinals (size >= 4)
+      let thirdPlaceMatch = null;
+      if (size >= 4) {
+        thirdPlaceMatch = {
+          id: 'THIRD-PLACE',
+          roundIndex: totalRounds - 1,
+          matchIndex: 99,
+          label: 'Perebutan Juara 3',
+          teamA: null, // Loser of Semifinal 1
+          teamB: null, // Loser of Semifinal 2
+          scoreA: null,
+          scoreB: null,
+          winnerId: null,
+          status: 'PENDING'
+        };
+      }
+
+      this.bracket = {
+        isCreated: true,
+        title: this.bracket.title || 'Turnamen Badminton Ganda Campuran',
+        size,
+        participantCount: n,
+        rounds,
+        thirdPlaceMatch,
+        activeBracketMatchId: null
+      };
+
+      // Auto-advance any BYE matches in Round 0
+      for (const match of this.bracket.rounds[0].matches) {
+        if (match.teamB && match.teamB.isBye && match.teamA) {
+          match.status = 'BYE';
+          this.advanceBracketMatchWinner(match, match.teamA.id, null, null, false);
+        }
+      }
+
+      this.saveBracket();
+    },
+
+    // Set winner of a bracket match and propagate winner (and Semifinal loser to 3rd Place match)
+    advanceBracketMatchWinner(matchObj, winningTeamId, scoreA = null, scoreB = null, shouldSave = true) {
+      if (!matchObj || !matchObj.teamA || !matchObj.teamB) return;
+
+      const winnerTeam =
+        matchObj.teamA.id === winningTeamId ? matchObj.teamA : matchObj.teamB;
+      const loserTeam =
+        matchObj.teamA.id === winningTeamId ? matchObj.teamB : matchObj.teamA;
+
+      matchObj.winnerId = winningTeamId;
+      if (scoreA !== null) matchObj.scoreA = scoreA;
+      if (scoreB !== null) matchObj.scoreB = scoreB;
+      if (matchObj.status !== 'BYE') {
+        matchObj.status = 'FINISHED';
+      }
+
+      // Check if this is the 3rd Place Match
+      if (matchObj.id === 'THIRD-PLACE') {
+        if (shouldSave) this.saveBracket();
+        return;
+      }
+
+      const totalRounds = this.bracket.rounds.length;
+      const rIdx = matchObj.roundIndex;
+      const mIdx = matchObj.matchIndex;
+
+      // Propagate Winner to Next Round
+      if (rIdx + 1 < totalRounds) {
+        const nextRound = this.bracket.rounds[rIdx + 1];
+        const nextMatchIndex = Math.floor(mIdx / 2);
+        const isSlotA = mIdx % 2 === 0;
+        const nextMatch = nextRound.matches[nextMatchIndex];
+
+        if (nextMatch) {
+          if (isSlotA) {
+            nextMatch.teamA = { id: winnerTeam.id, name: winnerTeam.name };
+          } else {
+            nextMatch.teamB = { id: winnerTeam.id, name: winnerTeam.name };
+          }
+          // Reset next match winner if participants changed
+          nextMatch.winnerId = null;
+          nextMatch.scoreA = null;
+          nextMatch.scoreB = null;
+          nextMatch.status = 'PENDING';
+        }
+      }
+
+      // BWF / Tournament Rule requested by user:
+      // - Teams losing BEFORE Semifinals (4 Besar) are immediately eliminated.
+      // - Teams losing IN Semifinals (4 Besar) go to the 3rd Place Playoff (Perebutan Juara 3)!
+      const isSemiFinalRound = totalRounds >= 2 && rIdx === totalRounds - 2;
+      if (isSemiFinalRound && this.bracket.thirdPlaceMatch) {
+        const isFirstSemi = mIdx === 0;
+        const cleanLoser =
+          loserTeam && !loserTeam.isBye
+            ? { id: loserTeam.id, name: loserTeam.name }
+            : { id: 'BYE', name: 'BYE', isBye: true };
+
+        if (isFirstSemi) {
+          this.bracket.thirdPlaceMatch.teamA = cleanLoser;
+        } else {
+          this.bracket.thirdPlaceMatch.teamB = cleanLoser;
+        }
+
+        // If one of the semifinal losers is a BYE, auto-award 3rd place to the real team
+        const tp = this.bracket.thirdPlaceMatch;
+        if (tp.teamA && tp.teamB) {
+          if (tp.teamA.isBye && !tp.teamB.isBye) {
+            tp.winnerId = tp.teamB.id;
+            tp.status = 'BYE';
+          } else if (tp.teamB.isBye && !tp.teamA.isBye) {
+            tp.winnerId = tp.teamA.id;
+            tp.status = 'BYE';
+          }
+        }
+      }
+
+      if (shouldSave) {
+        this.saveBracket();
+      }
+    },
+
+    // Launch a Bracket Match into Setup/Court so Umpire can pick players and score it
+    playBracketMatch(matchObj) {
+      if (!matchObj || !matchObj.teamA || !matchObj.teamB) return;
+      if (matchObj.teamA.isBye || matchObj.teamB.isBye) return;
+
+      this.bracket.activeBracketMatchId = matchObj.id;
+      this.saveBracket();
+
+      // Load Team A & Team B into Setup Config
+      this.onSelectTeamInSetup('A', matchObj.teamA.id);
+      this.onSelectTeamInSetup('B', matchObj.teamB.id);
+
+      // Navigate to Setup so Umpire can confirm/pick which male & female players play Set 1
+      this.screen = 'setup';
+    },
+
+    findBracketMatchById(matchId) {
+      if (!matchId || !this.bracket.isCreated) return null;
+      if (matchId === 'THIRD-PLACE') return this.bracket.thirdPlaceMatch;
+      for (const r of this.bracket.rounds) {
+        for (const m of r.matches) {
+          if (m.id === matchId) return m;
+        }
+      }
+      return null;
+    },
+
+    // Computed Tournament Podium (Juara 1, Juara 2, Juara 3)
+    get tournamentPodium() {
+      if (!this.bracket.isCreated || this.bracket.rounds.length === 0) {
+        return { first: null, second: null, third: null };
+      }
+
+      const finalRound = this.bracket.rounds[this.bracket.rounds.length - 1];
+      const finalMatch = finalRound.matches[0];
+
+      let first = null;
+      let second = null;
+      let third = null;
+
+      if (finalMatch && finalMatch.winnerId && finalMatch.teamA && finalMatch.teamB) {
+        first =
+          finalMatch.teamA.id === finalMatch.winnerId
+            ? finalMatch.teamA
+            : finalMatch.teamB;
+        second =
+          finalMatch.teamA.id === finalMatch.winnerId
+            ? finalMatch.teamB
+            : finalMatch.teamA;
+      }
+
+      const tp = this.bracket.thirdPlaceMatch;
+      if (tp && tp.winnerId && tp.teamA && tp.teamB) {
+        third = tp.teamA.id === tp.winnerId ? tp.teamA : tp.teamB;
+      }
+
+      return { first, second, third };
+    },
+
+    // ==========================================
     // SETUP & PRESET LOGIC
     // ==========================================
     applyPreset(presetName) {
@@ -350,19 +670,19 @@ function badmintonApp() {
       if (presetName === 'bwf21') {
         this.config.targetPoints = 21;
         this.config.deuceEnabled = true;
-        this.config.deuceAllowance = 9; // 21 + 9 = 30
+        this.config.deuceAllowance = 9;
         this.config.maxCap = 30;
         this.config.bestOf = 3;
       } else if (presetName === 'community15') {
         this.config.targetPoints = 15;
         this.config.deuceEnabled = true;
-        this.config.deuceAllowance = 3; // 15 + 3 = 18
+        this.config.deuceAllowance = 3;
         this.config.maxCap = 18;
         this.config.bestOf = 3;
       } else if (presetName === 'quick11') {
         this.config.targetPoints = 11;
         this.config.deuceEnabled = true;
-        this.config.deuceAllowance = 3; // 11 + 3 = 14
+        this.config.deuceAllowance = 3;
         this.config.maxCap = 14;
         this.config.bestOf = 1;
       }
@@ -480,16 +800,16 @@ function badmintonApp() {
 
       if (quadrant === 'top-left') {
         teamKey = leftTeam;
-        boxType = 'leftBox'; // Kotak Kiri (Ganjil)
+        boxType = 'leftBox';
       } else if (quadrant === 'bottom-left') {
         teamKey = leftTeam;
-        boxType = 'rightBox'; // Kotak Kanan (Genap)
+        boxType = 'rightBox';
       } else if (quadrant === 'top-right') {
         teamKey = rightTeam;
-        boxType = 'rightBox'; // Kotak Kanan (Genap)
+        boxType = 'rightBox';
       } else if (quadrant === 'bottom-right') {
         teamKey = rightTeam;
-        boxType = 'leftBox'; // Kotak Kiri (Ganjil)
+        boxType = 'leftBox';
       }
 
       const role = this.match.positions[teamKey][boxType];
@@ -576,7 +896,8 @@ function badmintonApp() {
         lastActionType: 'START',
         pointLogs: [],
         intervalReachedInCurrentSet: false,
-        rubberSwitchReached: false
+        rubberSwitchReached: false,
+        bracketMatchId: this.bracket.activeBracketMatchId || null
       };
 
       const srv = this.currentServerPlayer;
@@ -612,7 +933,6 @@ function badmintonApp() {
       this.saveActiveMatch();
     },
 
-    // CORE RALLY POINT HANDLER
     addPoint(scoringTeam) {
       if (this.match.isFinished || this.modals.setEnd.open) return;
 
@@ -621,12 +941,8 @@ function badmintonApp() {
       const previousServingTeam = this.match.servingTeam;
       const scoringTeamName = this.getTeamName(scoringTeam);
 
-      // 1. Add 1 point to rally winner
       this.match.scores[scoringTeam] += 1;
 
-      // 2. Check BWF Position Rotation Rule:
-      // - Did the SERVING team win the point? -> Continuous Service! Swap their Right & Left boxes.
-      // - Did the RECEIVING team win the point? -> Service Over! NO ONE swaps boxes.
       if (scoringTeam === previousServingTeam) {
         const currentRight = this.match.positions[scoringTeam].rightBox;
         const currentLeft = this.match.positions[scoringTeam].leftBox;
@@ -636,13 +952,11 @@ function badmintonApp() {
         this.match.lastActionType = 'HOLD_SERVE';
         this.triggerSwapAnimation(scoringTeam);
       } else {
-        // SERVICE OVER (Pindah Servis) - NO POSITION SWAP!
         this.match.servingTeam = scoringTeam;
         this.match.lastActionType = 'SERVICE_OVER';
         this.match.lastSwappedTeam = null;
       }
 
-      // 3. Record rally log
       const srvNow = this.currentServerPlayer;
       const rcvNow = this.currentReceiverPlayer;
       this.match.pointLogs.unshift({
@@ -658,19 +972,14 @@ function badmintonApp() {
         nextServe: `${srvNow.name} → ${rcvNow.name}`
       });
 
-      // 4. Check Set Win Condition
       if (this.checkIfSetWon(scoringTeam)) {
         this.handleSetWon(scoringTeam);
         this.saveActiveMatch();
         return;
       }
 
-      // 5. Check Mid-Game Interval & Rubber Set Court Switch
       this.checkIntervalAndRubberSwitch();
-
-      // 6. Announce score via Umpire TTS
       this.announceRallyResult(previousServingTeam !== scoringTeam);
-
       this.saveActiveMatch();
     },
 
@@ -838,6 +1147,25 @@ function badmintonApp() {
       if (this.match.setsWon[winnerTeam] >= setsRequired) {
         this.match.isFinished = true;
         this.match.winnerTeam = winnerTeam;
+
+        // If this match was launched from the Tournament Bracket, auto-update the Bracket!
+        if (this.match.bracketMatchId) {
+          const bMatch = this.findBracketMatchById(this.match.bracketMatchId);
+          if (bMatch) {
+            const winningTeamId =
+              winnerTeam === 'A' ? this.config.teamA.teamId : this.config.teamB.teamId;
+            this.advanceBracketMatchWinner(
+              bMatch,
+              winningTeamId,
+              this.match.setsWon.A,
+              this.match.setsWon.B,
+              true
+            );
+          }
+          this.bracket.activeBracketMatchId = null;
+          this.saveBracket();
+        }
+
         this.modals.matchEnd.open = true;
         this.recordMatchToHistory();
         this.speakUmpire(`Game, Set, and Match won by ${this.getTeamName(winnerTeam)}!`);
@@ -955,7 +1283,7 @@ function badmintonApp() {
         utter.rate = 1.0;
         window.speechSynthesis.speak(utter);
       } catch (e) {
-        // Ignore TTS errors on unsupported devices
+        // Ignore TTS errors
       }
     },
 
