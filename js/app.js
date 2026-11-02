@@ -313,6 +313,31 @@ function badmintonApp() {
 
     // Ensure Team A and Team B are never the same team
     ensureDistinctTeams() {
+      // If there is an active unplayed bracket match selected (or available), auto-select the first available bracket match!
+      if (this.bracket && this.bracket.isCreated && this.bracket.activeBracketMatchId !== 'MANUAL') {
+        const available = this.availableBracketMatches;
+        if (available.length > 0) {
+          const currentSelected = available.find(
+            (m) => m.id === this.bracket.activeBracketMatchId
+          );
+          if (!currentSelected) {
+            this.selectBracketMatchInSetup(available[0].id, false);
+            return;
+          } else {
+            // Ensure config.teamA and config.teamB stay synced with the selected bracket match
+            if (this.config.teamA.teamId !== currentSelected.teamA.id) {
+              this.onSelectTeamInSetup('A', currentSelected.teamA.id);
+            }
+            if (this.config.teamB.teamId !== currentSelected.teamB.id) {
+              this.onSelectTeamInSetup('B', currentSelected.teamB.id);
+            }
+            return;
+          }
+        } else {
+          this.bracket.activeBracketMatchId = null;
+        }
+      }
+
       if (this.masterTeams.length >= 2) {
         const existsA = this.masterTeams.some((t) => t.id === this.config.teamA.teamId);
         if (!existsA) {
@@ -326,6 +351,71 @@ function badmintonApp() {
           }
         }
       }
+    },
+
+    // List of all playable, unfinished matches from the Tournament Bracket
+    get availableBracketMatches() {
+      if (!this.bracket || !this.bracket.isCreated || !Array.isArray(this.bracket.rounds)) {
+        return [];
+      }
+
+      const list = [];
+      for (const round of this.bracket.rounds) {
+        for (const m of round.matches) {
+          const hasBothTeams =
+            m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye;
+          const isUnfinished = !m.winnerId && m.status !== 'FINISHED' && m.status !== 'BYE';
+          if (hasBothTeams && isUnfinished) {
+            list.push({
+              id: m.id,
+              roundName: round.name,
+              label: m.label,
+              teamA: m.teamA,
+              teamB: m.teamB,
+              previewText: `${m.label} (${round.name}) — ${m.teamA.name} vs ${m.teamB.name}`
+            });
+          }
+        }
+      }
+
+      // Also include 3rd Place Playoff if both Semifinal losers are ready and match is unfinished
+      const tp = this.bracket.thirdPlaceMatch;
+      if (tp && tp.teamA && tp.teamB && !tp.teamA.isBye && !tp.teamB.isBye && !tp.winnerId) {
+        list.push({
+          id: tp.id,
+          roundName: 'PEREBUTAN JUARA 3',
+          label: tp.label,
+          teamA: tp.teamA,
+          teamB: tp.teamB,
+          previewText: `${tp.label} — ${tp.teamA.name} vs ${tp.teamB.name}`
+        });
+      }
+
+      return list;
+    },
+
+    get selectedBracketMatchObj() {
+      if (!this.bracket || !this.bracket.activeBracketMatchId || this.bracket.activeBracketMatchId === 'MANUAL') {
+        return null;
+      }
+      return this.availableBracketMatches.find((m) => m.id === this.bracket.activeBracketMatchId) || null;
+    },
+
+    // When Umpire selects a Match from the Setup Match Picker
+    selectBracketMatchInSetup(matchId, shouldSave = true) {
+      if (!matchId || matchId === 'MANUAL') {
+        this.bracket.activeBracketMatchId = 'MANUAL';
+        if (shouldSave) this.saveBracket();
+        return;
+      }
+
+      const matchObj = this.findBracketMatchById(matchId);
+      if (!matchObj || !matchObj.teamA || !matchObj.teamB) return;
+
+      this.bracket.activeBracketMatchId = matchObj.id;
+      this.onSelectTeamInSetup('A', matchObj.teamA.id);
+      this.onSelectTeamInSetup('B', matchObj.teamB.id);
+      if (shouldSave) this.saveBracket();
     },
 
     get isSameTeamSelected() {
@@ -507,6 +597,9 @@ function badmintonApp() {
 
     saveBracket() {
       try {
+        if (!this.match || !this.match.isActive || this.match.isFinished) {
+          this.ensureDistinctTeams();
+        }
         localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
         this.pushToServer({ bracket: this.bracket });
       } catch (e) {
@@ -1189,7 +1282,10 @@ function badmintonApp() {
         pointLogs: [],
         intervalReachedInCurrentSet: false,
         rubberSwitchReached: false,
-        bracketMatchId: this.bracket.activeBracketMatchId || null
+        bracketMatchId:
+          this.bracket.activeBracketMatchId && this.bracket.activeBracketMatchId !== 'MANUAL'
+            ? this.bracket.activeBracketMatchId
+            : null
       };
 
       const srv = this.currentServerPlayer;
@@ -1620,6 +1716,17 @@ function badmintonApp() {
       this.match.isActive = false;
       localStorage.removeItem(STORAGE_KEY_ACTIVE);
       this.pushToServer({ activeMatch: null });
+
+      // Automatically pre-select the next unfinished match from the Bracket!
+      if (this.bracket && this.bracket.isCreated) {
+        const nextAvailable = this.availableBracketMatches;
+        if (nextAvailable.length > 0) {
+          this.selectBracketMatchInSetup(nextAvailable[0].id);
+        } else {
+          this.bracket.activeBracketMatchId = null;
+        }
+      }
+
       this.screen = 'setup';
     },
 

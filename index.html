@@ -29,7 +29,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=8" />
+  <link rel="stylesheet" href="css/style.css?v=9" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -386,26 +386,167 @@
           </div>
         </div>
 
-        <!-- RIGHT COLUMN: Pilih Tim & Anggota yang Bermain (7 cols on Desktop) -->
+        <!-- RIGHT COLUMN: Pilih Match dari Bracket & Anggota yang Bermain (7 cols on Desktop) -->
         <div class="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm flex flex-col justify-between">
           <div class="space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
               <div>
                 <h2 class="font-extrabold text-sm sm:text-base text-slate-900 flex items-center gap-2">
-                  <span>👫</span> Pilih Tim & Pasangan Pemain (Set 1)
+                  <span>🏆</span> Pilih Match & Pasangan Pemain (Set 1)
                 </h2>
                 <p class="text-[11px] sm:text-xs text-slate-500">
-                  Pilih tim dari daftar, lalu klik nama anggota yang turun bermain
+                  Pilih urutan match dari Bracket (tim terisi otomatis), lalu klik pemain yang bertanding
                 </p>
               </div>
-              <button
-                type="button"
-                @click="screen = 'teams'"
-                class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-auto"
+              <div class="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+                <button
+                  type="button"
+                  @click="screen = 'bracket'"
+                  class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                >
+                  <span>🏆</span>
+                  <span>Lihat Bracket</span>
+                </button>
+                <button
+                  type="button"
+                  @click="screen = 'teams'"
+                  class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                >
+                  <span>👥</span>
+                  <span>Daftar Tim</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- AUTO MATCH SELECTOR FROM BRACKET           -->
+            <!-- ========================================== -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-3.5 space-y-3">
+              <!-- Header + Toggle Manual Mode -->
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider">
+                    Jadwal Match Aktif
+                  </span>
+                  <span
+                    x-show="bracket.isCreated && availableBracketMatches.length > 0"
+                    class="text-[11px] font-bold text-slate-600"
+                    x-text="availableBracketMatches.length + ' match belum dimainkan'"
+                  ></span>
+                </div>
+
+                <!-- Switch between Bracket Match & Manual Team Picker -->
+                <div x-show="bracket.isCreated && availableBracketMatches.length > 0">
+                  <button
+                    type="button"
+                    x-show="bracket.activeBracketMatchId !== 'MANUAL'"
+                    @click="selectBracketMatchInSetup('MANUAL')"
+                    class="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline transition"
+                  >
+                    Pilih Tim Manual (Non-Bracket)
+                  </button>
+                  <button
+                    type="button"
+                    x-show="bracket.activeBracketMatchId === 'MANUAL'"
+                    @click="selectBracketMatchInSetup(availableBracketMatches[0]?.id)"
+                    class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold shadow-sm transition"
+                  >
+                    ← Kembali ke Jadwal Bracket
+                  </button>
+                </div>
+              </div>
+
+              <!-- CASE 1: Bracket Not Created Yet -->
+              <div
+                x-show="!bracket.isCreated"
+                class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
               >
-                <span>👥</span>
-                <span>Kelola Daftar Tim →</span>
-              </button>
+                <div class="text-xs text-amber-900">
+                  <div class="font-extrabold">Bagan Bracket Belum Dibuat</div>
+                  <p class="text-[11px] text-amber-700">
+                    Buat Bracket terlebih dahulu agar daftar match (Tim vs Tim) muncul otomatis di sini.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  @click="generateBracket(true)"
+                  class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition shrink-0 shadow-sm"
+                >
+                  ⚡ Buat Bracket Sekarang
+                </button>
+              </div>
+
+              <!-- CASE 2: Bracket Created & Has Playable Unfinished Matches -->
+              <div x-show="bracket.isCreated && availableBracketMatches.length > 0" class="space-y-2.5">
+                <!-- Dropdown Selector for Quick Jump -->
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">
+                    Pilih Pertandingan (Otomatis Mengisi Tim A vs Tim B):
+                  </label>
+                  <select
+                    :value="bracket.activeBracketMatchId || ''"
+                    @change="selectBracketMatchInSetup($event.target.value)"
+                    class="w-full bg-white border-2 border-emerald-500/80 rounded-xl px-3 py-2 text-xs sm:text-sm font-extrabold text-slate-900 focus:border-emerald-600 focus:outline-none shadow-sm"
+                  >
+                    <template x-for="m in availableBracketMatches" :key="m.id">
+                      <option
+                        :value="m.id"
+                        :selected="bracket.activeBracketMatchId === m.id"
+                        x-text="'[' + m.label + ' • ' + m.roundName + ']  ' + m.teamA.name + '  VS  ' + m.teamB.name"
+                      ></option>
+                    </template>
+                    <option value="MANUAL">-- Mode Manual (Pilih Pasangan Tim Bebas di Luar Bracket) --</option>
+                  </select>
+                </div>
+
+                <!-- Interactive Match Cards with Team vs Team Preview -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-0.5">
+                  <template x-for="m in availableBracketMatches" :key="'card-' + m.id">
+                    <button
+                      type="button"
+                      @click="selectBracketMatchInSetup(m.id)"
+                      :class="bracket.activeBracketMatchId === m.id
+                        ? 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-500/30 shadow-sm'
+                        : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-slate-50/70'"
+                      class="p-2.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5"
+                    >
+                      <div class="flex items-center justify-between gap-1 w-full">
+                        <span
+                          :class="bracket.activeBracketMatchId === m.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'"
+                          class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                          x-text="m.label"
+                        ></span>
+                        <span class="text-[10px] font-bold text-slate-400 truncate" x-text="m.roundName"></span>
+                      </div>
+                      <div class="flex items-center justify-between gap-1.5 text-xs font-extrabold text-slate-900 w-full">
+                        <span class="truncate text-emerald-800" x-text="m.teamA.name"></span>
+                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black shrink-0">VS</span>
+                        <span class="truncate text-indigo-800 text-right" x-text="m.teamB.name"></span>
+                      </div>
+                    </button>
+                  </template>
+                </div>
+              </div>
+
+              <!-- CASE 3: All Bracket Matches Completed -->
+              <div
+                x-show="bracket.isCreated && availableBracketMatches.length === 0"
+                class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+              >
+                <div class="text-xs text-emerald-900">
+                  <div class="font-extrabold">🎉 Seluruh Pertandingan di Bracket Telah Selesai!</div>
+                  <p class="text-[11px] text-emerald-700">
+                    Tidak ada antrean match tersisa. Anda dapat melihat hasil juara di Bracket atau bermain mode manual.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  @click="screen = 'bracket'"
+                  class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shrink-0"
+                >
+                  🏆 Lihat Podium Juara
+                </button>
+              </div>
             </div>
 
             <!-- Team A & Team B Selection Cards -->
@@ -427,7 +568,17 @@
                   </button>
                 </div>
 
-                <div>
+                <!-- Auto-Selected Team A Display (when Bracket Match is Active) -->
+                <div x-show="selectedBracketMatchObj !== null" class="bg-emerald-600/10 border border-emerald-300 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div class="text-[10px] font-bold uppercase text-emerald-700">Tim A (Otomatis dari Match)</div>
+                    <div class="text-sm font-black text-slate-900" x-text="config.teamA.name"></div>
+                  </div>
+                  <span class="text-base">🛡️</span>
+                </div>
+
+                <!-- Manual Team A Dropdown (Only shown when in Manual Mode or No Bracket) -->
+                <div x-show="selectedBracketMatchObj === null">
                   <label class="block text-[11px] font-bold text-slate-700 mb-1">Pilih Tim A:</label>
                   <select
                     x-model="config.teamA.teamId"
@@ -533,7 +684,17 @@
                   </button>
                 </div>
 
-                <div>
+                <!-- Auto-Selected Team B Display (when Bracket Match is Active) -->
+                <div x-show="selectedBracketMatchObj !== null" class="bg-indigo-600/10 border border-indigo-300 rounded-lg px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div class="text-[10px] font-bold uppercase text-indigo-700">Tim B (Otomatis dari Match)</div>
+                    <div class="text-sm font-black text-slate-900" x-text="config.teamB.name"></div>
+                  </div>
+                  <span class="text-base">⚔️</span>
+                </div>
+
+                <!-- Manual Team B Dropdown (Only shown when in Manual Mode or No Bracket) -->
+                <div x-show="selectedBracketMatchObj === null">
                   <label class="block text-[11px] font-bold text-slate-700 mb-1">Pilih Tim B:</label>
                   <select
                     x-model="config.teamB.teamId"
@@ -2118,11 +2279,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=8"></script>
+  <script src="js/app.js?v=9"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=8').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=9').then((reg) => {
           reg.update();
         }).catch(() => {});
       });
