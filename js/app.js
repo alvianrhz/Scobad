@@ -78,6 +78,11 @@ function badmintonApp() {
     masterTeams: [],
     newTeamNameInput: '',
     newMemberInputs: {},
+    editingTeamId: null,
+    editingTeamName: '',
+    editingMemberId: null,
+    editingMemberName: '',
+    editingMemberGender: 'male',
 
     // Tournament Bracket State
     bracket: {
@@ -238,10 +243,12 @@ function badmintonApp() {
     },
 
     async pullFromServer() {
-      // Never pull/overwrite while a push is in flight or within 2.5s of a local action
+      // Never pull/overwrite while a push is in flight, while editing team/member, or within 2.5s of a local action
       if (
         this.syncState.isPushing ||
         this.syncState.pendingPushes > 0 ||
+        this.editingTeamId !== null ||
+        this.editingMemberId !== null ||
         Date.now() - (this.syncState.lastLocalMutationAt || 0) < 2500
       ) {
         return;
@@ -512,6 +519,104 @@ function badmintonApp() {
       });
       this.newMemberInputs[newId] = { name: '', gender: 'male' };
       this.newTeamNameInput = '';
+      this.saveMasterTeams();
+    },
+
+    startEditMasterTeam(team) {
+      if (!team) return;
+      this.editingTeamId = team.id;
+      this.editingTeamName = team.name;
+    },
+
+    cancelEditMasterTeam() {
+      this.editingTeamId = null;
+      this.editingTeamName = '';
+    },
+
+    saveEditMasterTeam(teamId) {
+      const newName = (this.editingTeamName || '').trim();
+      if (!newName) return;
+
+      const team = this.masterTeams.find((t) => t.id === teamId);
+      if (!team) return;
+
+      team.name = newName;
+      this.editingTeamId = null;
+      this.editingTeamName = '';
+
+      // Also sync name in Setup config if this team is selected
+      if (this.config.teamA.teamId === teamId) {
+        this.config.teamA.name = newName;
+      }
+      if (this.config.teamB.teamId === teamId) {
+        this.config.teamB.name = newName;
+      }
+
+      // Also sync name across all Bracket matches if Bracket already exists
+      if (this.bracket && this.bracket.isCreated) {
+        for (const r of this.bracket.rounds || []) {
+          for (const m of r.matches || []) {
+            if (m.teamA && m.teamA.id === teamId) m.teamA.name = newName;
+            if (m.teamB && m.teamB.id === teamId) m.teamB.name = newName;
+          }
+        }
+        if (this.bracket.thirdPlaceMatch) {
+          const tp = this.bracket.thirdPlaceMatch;
+          if (tp.teamA && tp.teamA.id === teamId) tp.teamA.name = newName;
+          if (tp.teamB && tp.teamB.id === teamId) tp.teamB.name = newName;
+        }
+        this.saveBracket(false);
+        this.saveMasterTeams();
+        this.pushToServer({
+          masterTeams: this.masterTeams,
+          bracket: this.bracket
+        });
+        return;
+      }
+
+      this.saveMasterTeams();
+    },
+
+    startEditMember(member) {
+      if (!member) return;
+      this.editingMemberId = member.id;
+      this.editingMemberName = member.name;
+      this.editingMemberGender = member.gender || 'male';
+    },
+
+    cancelEditMember() {
+      this.editingMemberId = null;
+      this.editingMemberName = '';
+      this.editingMemberGender = 'male';
+    },
+
+    saveEditMember(teamId, memberId) {
+      const newName = (this.editingMemberName || '').trim();
+      if (!newName) return;
+
+      const team = this.masterTeams.find((t) => t.id === teamId);
+      if (!team) return;
+
+      const member = team.members.find((m) => m.id === memberId);
+      if (!member) return;
+
+      const oldName = member.name;
+      member.name = newName;
+      member.gender = this.editingMemberGender || 'male';
+
+      this.editingMemberId = null;
+      this.editingMemberName = '';
+
+      // Update Setup player name if currently selected
+      if (this.config.teamA.teamId === teamId) {
+        if (this.config.teamA.male === oldName) this.config.teamA.male = newName;
+        if (this.config.teamA.female === oldName) this.config.teamA.female = newName;
+      }
+      if (this.config.teamB.teamId === teamId) {
+        if (this.config.teamB.male === oldName) this.config.teamB.male = newName;
+        if (this.config.teamB.female === oldName) this.config.teamB.female = newName;
+      }
+
       this.saveMasterTeams();
     },
 

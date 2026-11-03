@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="description" content="GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen dan panduan posisi servis resmi BWF." />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="manifest" href="manifest.json?v=11" />
+  <link rel="manifest" href="manifest.json?v=12" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 
   <!-- Google Fonts -->
@@ -32,7 +32,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=11" />
+  <link rel="stylesheet" href="css/style.css?v=12" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -878,19 +878,65 @@
           <template x-for="team in masterTeams" :key="team.id">
             <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-4">
               <div class="space-y-3">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <div class="min-w-0 pr-2">
-                    <h3 class="font-extrabold text-sm sm:text-base text-slate-900 truncate" x-text="team.name"></h3>
-                    <span class="text-[11px] text-slate-500 font-medium" x-text="team.members.length + ' anggota terdaftar'"></span>
+                <!-- Team Header: View Mode vs Edit Mode -->
+                <div class="border-b border-slate-100 pb-2.5">
+                  <!-- View Mode -->
+                  <div x-show="editingTeamId !== team.id" class="flex items-center justify-between gap-2">
+                    <div class="min-w-0 pr-1">
+                      <h3 class="font-extrabold text-sm sm:text-base text-slate-900 truncate" x-text="team.name"></h3>
+                      <span class="text-[11px] text-slate-500 font-medium" x-text="team.members.length + ' anggota terdaftar'"></span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        @click="startEditMasterTeam(team)"
+                        title="Edit Nama Tim"
+                        class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200 transition flex items-center gap-1"
+                      >
+                        <span>✏️</span>
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        @click="deleteMasterTeam(team.id)"
+                        title="Hapus Tim"
+                        class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold border border-rose-200 transition"
+                      >
+                        Hapus
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    @click="deleteMasterTeam(team.id)"
-                    title="Hapus Tim"
-                    class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold border border-rose-200 transition shrink-0"
-                  >
-                    Hapus
-                  </button>
+
+                  <!-- Inline Edit Team Name Mode -->
+                  <div x-show="editingTeamId === team.id" class="space-y-2 bg-amber-50/60 border border-amber-200 rounded-xl p-2.5">
+                    <label class="block text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+                      ✏️ Ubah Nama Tim:
+                    </label>
+                    <input
+                      type="text"
+                      x-model="editingTeamName"
+                      @keydown.enter.prevent="saveEditMasterTeam(team.id)"
+                      @keydown.escape.prevent="cancelEditMasterTeam()"
+                      placeholder="Nama Tim..."
+                      class="w-full bg-white border border-amber-400 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-extrabold text-slate-900 focus:border-emerald-600 focus:outline-none"
+                    />
+                    <div class="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        @click="cancelEditMasterTeam()"
+                        class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-600 text-[11px] font-bold border border-slate-200 transition"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        @click="saveEditMasterTeam(team.id)"
+                        class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold transition shadow-sm"
+                      >
+                        ✓ Simpan Nama
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Member List -->
@@ -899,28 +945,75 @@
                     Belum ada anggota di tim ini.
                   </div>
                   <template x-for="m in team.members" :key="m.id">
-                    <div class="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                      <div class="flex items-center gap-2 min-w-0">
-                        <span
-                          class="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold border shrink-0"
-                          :class="m.gender === 'male' ? 'bg-sky-100 text-sky-700 border-sky-200' : 'bg-pink-100 text-pink-700 border-pink-200'"
-                          x-text="m.gender === 'male' ? '♂' : '♀'"
-                        ></span>
-                        <span class="text-xs font-bold text-slate-800 truncate" x-text="m.name"></span>
-                        <span
-                          class="text-[10px] px-1.5 py-0.2 rounded font-semibold shrink-0"
-                          :class="m.gender === 'male' ? 'text-sky-700 bg-sky-50' : 'text-pink-700 bg-pink-50'"
-                          x-text="m.gender === 'male' ? 'Pria' : 'Wanita'"
-                        ></span>
+                    <div class="rounded-xl bg-slate-50 border border-slate-200/80 px-2.5 py-1.5">
+                      <!-- Member View Mode -->
+                      <div x-show="editingMemberId !== m.id" class="flex items-center justify-between gap-1">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span
+                            class="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold border shrink-0"
+                            :class="m.gender === 'male' ? 'bg-sky-100 text-sky-700 border-sky-200' : 'bg-pink-100 text-pink-700 border-pink-200'"
+                            x-text="m.gender === 'male' ? '♂' : '♀'"
+                          ></span>
+                          <span class="text-xs font-bold text-slate-800 truncate" x-text="m.name"></span>
+                          <span
+                            class="text-[10px] px-1.5 py-0.2 rounded font-semibold shrink-0"
+                            :class="m.gender === 'male' ? 'text-sky-700 bg-sky-50' : 'text-pink-700 bg-pink-50'"
+                            x-text="m.gender === 'male' ? 'Pria' : 'Wanita'"
+                          ></span>
+                        </div>
+                        <div class="flex items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            @click="startEditMember(m)"
+                            class="text-slate-400 hover:text-amber-600 text-xs px-1.5 py-0.5 rounded transition"
+                            title="Edit Anggota"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            type="button"
+                            @click="removeMemberFromMasterTeam(team.id, m.id)"
+                            class="text-slate-400 hover:text-rose-600 font-bold text-sm px-1.5 py-0.5 rounded transition"
+                            title="Hapus Anggota"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        @click="removeMemberFromMasterTeam(team.id, m.id)"
-                        class="text-slate-400 hover:text-rose-600 font-bold text-sm px-1.5 shrink-0"
-                        title="Hapus Anggota"
-                      >
-                        ×
-                      </button>
+
+                      <!-- Member Inline Edit Mode -->
+                      <div x-show="editingMemberId === m.id" class="flex items-center gap-1.5 py-0.5">
+                        <select
+                          x-model="editingMemberGender"
+                          class="bg-white border border-amber-300 rounded-lg px-1.5 py-1 text-[11px] font-bold text-slate-800 focus:outline-none shrink-0"
+                        >
+                          <option value="male">♂ Pria</option>
+                          <option value="female">♀ Wanita</option>
+                        </select>
+                        <input
+                          type="text"
+                          x-model="editingMemberName"
+                          @keydown.enter.prevent="saveEditMember(team.id, m.id)"
+                          @keydown.escape.prevent="cancelEditMember()"
+                          class="flex-1 min-w-0 bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          @click="saveEditMember(team.id, m.id)"
+                          class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-extrabold shrink-0"
+                          title="Simpan"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          @click="cancelEditMember()"
+                          class="px-1.5 py-1 rounded-lg bg-slate-200 text-slate-700 text-[11px] font-bold shrink-0"
+                          title="Batal"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   </template>
                 </div>
@@ -2289,11 +2382,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=11"></script>
+  <script src="js/app.js?v=12"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=11').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=12').then((reg) => {
           reg.update();
         }).catch(() => {});
       });
