@@ -1,7 +1,7 @@
 {
   "name": "GF ScoBad",
   "short_name": "GF ScoBad",
-  "description": "Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen, panduan posisi pemain ganjil-genap, dan perpindahan servis otomatis.",
+  "description": "GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen, panduan posisi pemain ganjil-genap, dan perpindahan servis otomatis.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -16,3 +16,4 @@
     }
   ]
 }
+
