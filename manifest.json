@@ -1,10 +1,10 @@
 {
-  "name": "Badminton Mixed Doubles Score & Position Guide",
-  "short_name": "SkorBadminton",
-  "description": "Aplikasi penghitung skor badminton ganda campuran lengkap dengan panduan posisi pemain ganjil-genap dan perpindahan servis otomatis.",
+  "name": "GF ScoBad",
+  "short_name": "GF ScoBad",
+  "description": "Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen, panduan posisi pemain ganjil-genap, dan perpindahan servis otomatis.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
+  "background_color": "#ffffff",
   "theme_color": "#059669",
   "orientation": "any",
   "icons": [
@@ -16,4 +16,3 @@
     }
   ]
 }
-

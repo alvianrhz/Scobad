@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Skor Badminton Ganda Campuran — Panduan Posisi & Servis BWF</title>
-  <meta name="description" content="Aplikasi penghitung skor badminton ganda campuran lengkap dengan visualisasi perpindahan posisi ganjil-genap dan servis resmi BWF." />
+  <title>GF ScoBad — Skor Badminton & Bracket Turnamen</title>
+  <meta name="application-name" content="GF ScoBad" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="GF ScoBad" />
+  <meta name="description" content="GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen dan visualisasi perpindahan posisi resmi BWF." />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="manifest.json?v=11" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="apple-touch-icon" href="assets/icon.svg" />
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -29,7 +33,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=10" />
+  <link rel="stylesheet" href="css/style.css?v=11" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -48,7 +52,7 @@
         </div>
         <div class="truncate">
           <h1 class="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 leading-none">
-            Skor<span class="text-emerald-600">Badminton</span>
+            GF <span class="text-emerald-600">ScoBad</span>
           </h1>
           <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">Ganda Campuran • BWF & Turnamen</p>
         </div>
@@ -2286,11 +2290,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=10"></script>
+  <script src="js/app.js?v=11"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=10').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=11').then((reg) => {
           reg.update();
         }).catch(() => {});
       });

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skor-badminton-v10';
+const CACHE_NAME = 'gf-scobad-v11';
 const ASSETS = [
   './',
   './index.html',
