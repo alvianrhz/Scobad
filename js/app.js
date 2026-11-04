@@ -174,8 +174,16 @@ function badmintonApp() {
       matchEnd: {
         open: false,
         bracketUpdatedLabel: ''
+      },
+      passwordPrompt: {
+        open: false,
+        actionTitle: '',
+        input: '',
+        showPassword: false,
+        error: ''
       }
     },
+    _pendingProtectedCallback: null,
 
     // Saved Match History
     matchHistory: [],
@@ -541,10 +549,62 @@ function badmintonApp() {
       this.saveMasterTeams();
     },
 
+    // ==========================================
+    // ADMIN PASSWORD PROTECTION ('solatlahdulu')
+    // ==========================================
+    requestProtectedAction(actionTitle, callback) {
+      this._pendingProtectedCallback = callback;
+      this.modals.passwordPrompt = {
+        open: true,
+        actionTitle: actionTitle || 'Aksi Edit / Hapus Data',
+        input: '',
+        showPassword: false,
+        error: ''
+      };
+      setTimeout(() => {
+        const el = document.getElementById('admin-password-input');
+        if (el) el.focus();
+      }, 60);
+    },
+
+    closePasswordPrompt() {
+      this.modals.passwordPrompt.open = false;
+      this.modals.passwordPrompt.input = '';
+      this.modals.passwordPrompt.error = '';
+      this._pendingProtectedCallback = null;
+    },
+
+    confirmPasswordPrompt() {
+      const entered = (this.modals.passwordPrompt.input || '').trim();
+      if (entered !== 'solatlahdulu') {
+        this.modals.passwordPrompt.error = 'Password salah! Akses ditolak.';
+        return;
+      }
+      const fn = this._pendingProtectedCallback;
+      this.closePasswordPrompt();
+      if (typeof fn === 'function') {
+        fn();
+      }
+    },
+
+    toggleBracketEditMode() {
+      if (this.bracket.editMode) {
+        this.bracket.editMode = false;
+        this.saveBracket();
+        return;
+      }
+      this.requestProtectedAction('Atur Manual Tim & Urutan Bracket', () => {
+        this.bracket.editMode = true;
+        this.saveBracket();
+      });
+    },
+
     startEditMasterTeam(team) {
       if (!team) return;
-      this.editingTeamId = team.id;
-      this.editingTeamName = team.name;
+      this.requestProtectedAction(`Edit Nama Tim (${team.name})`, () => {
+        this.editingTeamId = team.id;
+        this.editingTeamName = team.name;
+      });
     },
 
     cancelEditMasterTeam() {
@@ -598,9 +658,11 @@ function badmintonApp() {
 
     startEditMember(member) {
       if (!member) return;
-      this.editingMemberId = member.id;
-      this.editingMemberName = member.name;
-      this.editingMemberGender = member.gender || 'male';
+      this.requestProtectedAction(`Edit Anggota (${member.name})`, () => {
+        this.editingMemberId = member.id;
+        this.editingMemberName = member.name;
+        this.editingMemberGender = member.gender || 'male';
+      });
     },
 
     cancelEditMember() {
@@ -640,9 +702,13 @@ function badmintonApp() {
     },
 
     deleteMasterTeam(teamId) {
-      this.masterTeams = this.masterTeams.filter((t) => t.id !== teamId);
-      this.saveMasterTeams();
-      this.ensureDistinctTeams();
+      const team = this.masterTeams.find((t) => t.id === teamId);
+      const label = team ? `Hapus Tim (${team.name})` : 'Hapus Tim';
+      this.requestProtectedAction(label, () => {
+        this.masterTeams = this.masterTeams.filter((t) => t.id !== teamId);
+        this.saveMasterTeams();
+        this.ensureDistinctTeams();
+      });
     },
 
     addMemberToMasterTeam(teamId) {
@@ -672,8 +738,16 @@ function badmintonApp() {
     removeMemberFromMasterTeam(teamId, memberId) {
       const team = this.masterTeams.find((t) => t.id === teamId);
       if (!team) return;
-      team.members = team.members.filter((m) => m.id !== memberId);
-      this.saveMasterTeams();
+      const member = team.members.find((m) => m.id === memberId);
+      const label = member
+        ? `Hapus Anggota (${member.name} dari ${team.name})`
+        : 'Hapus Anggota Tim';
+      this.requestProtectedAction(label, () => {
+        const targetTeam = this.masterTeams.find((t) => t.id === teamId);
+        if (!targetTeam) return;
+        targetTeam.members = targetTeam.members.filter((m) => m.id !== memberId);
+        this.saveMasterTeams();
+      });
     },
 
     getTeamMembersList(sideKey) {
@@ -778,9 +852,16 @@ function badmintonApp() {
     },
 
     // Generate Knockout Bracket based on registered masterTeams
-    generateBracket(shuffleTeams = true) {
+    generateBracket(shuffleTeams = true, bypassPassword = false) {
       if (this.masterTeams.length < 2) {
         alert('Minimal harus ada 2 tim terdaftar di menu Daftar Tim untuk membuat Bracket!');
+        return;
+      }
+
+      if (this.bracket && this.bracket.isCreated && !bypassPassword) {
+        this.requestProtectedAction('Reset / Buat Ulang Bagan Bracket', () => {
+          this.generateBracket(shuffleTeams, true);
+        });
         return;
       }
 
@@ -2103,9 +2184,11 @@ function badmintonApp() {
     },
 
     clearHistory() {
-      this.matchHistory = [];
-      localStorage.removeItem(STORAGE_KEY_HISTORY);
-      this.pushToServer({ matchHistory: [] });
+      this.requestProtectedAction('Hapus Semua Riwayat Pertandingan', () => {
+        this.matchHistory = [];
+        localStorage.removeItem(STORAGE_KEY_HISTORY);
+        this.pushToServer({ matchHistory: [] });
+      });
     }
   };
 }
