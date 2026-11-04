@@ -186,12 +186,19 @@ function badmintonApp() {
       this.loadBracket();
       this.loadHistory();
       this.loadActiveMatch();
-      this.ensureDistinctTeams();
       this.syncMaxCap();
 
-      // Connect to Centralized Server API (api.php) and start real-time polling
+      // Connect to Centralized Server API (api.php) FIRST before any auto-selection saves
       await this.initialServerSync();
+      if (!this.match || !this.match.isActive) {
+        this.ensureDistinctTeams();
+      }
       this.startServerPolling();
+    },
+
+    isDefaultTeamsData(teamsList) {
+      if (!Array.isArray(teamsList) || teamsList.length === 0) return true;
+      return JSON.stringify(teamsList) === JSON.stringify(DEFAULT_MASTER_TEAMS);
     },
 
     // ==========================================
@@ -205,24 +212,36 @@ function badmintonApp() {
         if (!json || !json.ok || !json.data) throw new Error('Invalid API response');
 
         const serverData = json.data;
-        const serverHasCustomTeams =
-          Array.isArray(serverData.masterTeams) && serverData.masterTeams.length > 4;
-        const serverHasBracket =
-          serverData.bracket && serverData.bracket.isCreated;
-        const localHasCustomTeams =
-          Array.isArray(this.masterTeams) && this.masterTeams.length > 4;
-        const localHasBracket = this.bracket && this.bracket.isCreated;
+        const serverHasCustomTeams = !this.isDefaultTeamsData(serverData.masterTeams);
+        const serverHasBracket = Boolean(
+          serverData.bracket && serverData.bracket.isCreated
+        );
+        const localHasCustomTeams = !this.isDefaultTeamsData(this.masterTeams);
+        const localHasBracket = Boolean(this.bracket && this.bracket.isCreated);
 
-        // If server is still fresh/empty but this Admin browser already has teams/bracket, push local data to server first!
-        if ((!serverHasCustomTeams && localHasCustomTeams) || (!serverHasBracket && localHasBracket)) {
-          await this.pushToServer({
-            masterTeams: this.masterTeams,
-            bracket: this.bracket,
-            activeMatch: this.match.isActive
-              ? { config: this.config, match: this.match }
-              : null,
-            matchHistory: this.matchHistory
-          });
+        // If server is still fresh/default (or was accidentally reset to default)
+        // while this Admin device has real custom teams or bracket in localStorage, restore local data to server!
+        if (
+          (!serverHasCustomTeams && localHasCustomTeams) ||
+          (!serverHasBracket && localHasBracket)
+        ) {
+          const payloadToRestore = {};
+          if (!serverHasCustomTeams && localHasCustomTeams) {
+            payloadToRestore.masterTeams = this.masterTeams;
+          } else if (serverHasCustomTeams) {
+            this.masterTeams = serverData.masterTeams;
+            this.initMemberInputs();
+            localStorage.setItem(STORAGE_KEY_TEAMS, JSON.stringify(this.masterTeams));
+          }
+
+          if (!serverHasBracket && localHasBracket) {
+            payloadToRestore.bracket = this.bracket;
+          } else if (serverHasBracket) {
+            this.bracket = { ...this.bracket, ...serverData.bracket };
+            localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
+          }
+
+          await this.pushToServer(payloadToRestore);
         } else {
           this.applyServerState(serverData, json.updatedAt);
         }
@@ -486,8 +505,8 @@ function badmintonApp() {
       } catch (e) {
         console.warn('Failed to load master teams:', e);
       }
+      // Fallback in memory ONLY — never push default teams to server on initial load!
       this.masterTeams = JSON.parse(JSON.stringify(DEFAULT_MASTER_TEAMS));
-      this.saveMasterTeams();
       this.initMemberInputs();
     },
 

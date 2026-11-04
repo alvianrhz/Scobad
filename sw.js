@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gf-scobad-v12';
+const CACHE_NAME = 'gf-scobad-v13';
 const ASSETS = [
   './',
   './index.html',

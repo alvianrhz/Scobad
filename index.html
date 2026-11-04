@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="description" content="GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen dan panduan posisi servis resmi BWF." />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="manifest" href="manifest.json?v=12" />
+  <link rel="manifest" href="manifest.json?v=13" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 
   <!-- Google Fonts -->
@@ -32,7 +32,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=12" />
+  <link rel="stylesheet" href="css/style.css?v=13" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -2382,11 +2382,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=12"></script>
+  <script src="js/app.js?v=13"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=12').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=13').then((reg) => {
           reg.update();
         }).catch(() => {});
       });
