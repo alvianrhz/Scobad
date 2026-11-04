@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="description" content="GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen dan panduan posisi servis resmi BWF." />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="manifest" href="manifest.json?v=15" />
+  <link rel="manifest" href="manifest.json?v=16" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 
   <!-- Google Fonts -->
@@ -32,7 +32,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=15" />
+  <link rel="stylesheet" href="css/style.css?v=16" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -2636,16 +2636,32 @@
         </button>
       </div>
 
-      <!-- Target Action Badge -->
-      <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
-        <span class="text-slate-500 font-semibold">Aksi:</span>
-        <strong class="text-slate-900 ml-1" x-text="modals.passwordPrompt.actionTitle"></strong>
+      <!-- Target Action & Category Badge -->
+      <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jenis Hak Akses:</span>
+          <span
+            class="px-2 py-0.5 rounded-full text-[10px] font-extrabold border"
+            :class="{
+              'bg-emerald-50 text-emerald-800 border-emerald-200': modals.passwordPrompt.category === 'wasit',
+              'bg-amber-50 text-amber-800 border-amber-200': modals.passwordPrompt.category === 'edit',
+              'bg-rose-50 text-rose-700 border-rose-200': modals.passwordPrompt.category === 'delete'
+            }"
+            x-text="modals.passwordPrompt.category === 'delete'
+              ? '🗑️ Aksi Hapus Data'
+              : (modals.passwordPrompt.category === 'edit' ? '✏️ Aksi Edit Data' : '🏸 Aksi Tambah / Wasit')"
+          ></span>
+        </div>
+        <div>
+          <span class="text-slate-500 font-semibold">Aksi:</span>
+          <strong class="text-slate-900 ml-1" x-text="modals.passwordPrompt.actionTitle"></strong>
+        </div>
       </div>
 
       <!-- Password Input Field -->
       <div class="space-y-1.5">
         <label for="admin-password-input" class="block text-xs font-bold text-slate-700">
-          Masukkan Password Admin:
+          Masukkan Password Sesuai Aksi:
         </label>
         <div class="relative flex items-center">
           <input
@@ -2698,11 +2714,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=15"></script>
+  <script src="js/app.js?v=16"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=15').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=16').then((reg) => {
           reg.update();
         }).catch(() => {});
       });
