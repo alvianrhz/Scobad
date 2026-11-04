@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="description" content="GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen dan panduan posisi servis resmi BWF." />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="manifest" href="manifest.json?v=14" />
+  <link rel="manifest" href="manifest.json?v=15" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 
   <!-- Google Fonts -->
@@ -32,7 +32,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=14" />
+  <link rel="stylesheet" href="css/style.css?v=15" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -145,6 +145,20 @@
           ></span>
           <span x-text="syncState.status === 'synced' ? 'Terpusat' : (syncState.status === 'offline' ? 'Offline' : 'Sync...')"></span>
         </div>
+
+        <!-- Admin / Spectator Mode Toggle Button -->
+        <button
+          type="button"
+          @click="toggleAdminSession()"
+          :title="isAdminUnlocked ? 'Mode Wasit/Admin Aktif — Klik untuk Kunci Kembali ke Mode Penonton' : 'Mode Penonton (Read-Only) — Klik untuk Buka Akses Wasit/Admin'"
+          :class="isAdminUnlocked
+            ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'"
+          class="flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] sm:text-[11px] font-bold transition"
+        >
+          <span x-text="isAdminUnlocked ? '🔓' : '👀'"></span>
+          <span class="hidden sm:inline" x-text="isAdminUnlocked ? 'Wasit/Admin' : 'Penonton'"></span>
+        </button>
 
         <!-- Umpire Voice Toggle -->
         <button
@@ -853,6 +867,53 @@
           </button>
         </div>
 
+        <!-- Panel Backup, Restore & Sinkronisasi Server (Opsi 6) -->
+        <div class="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div class="text-xs">
+            <div class="font-extrabold text-emerald-900 flex items-center gap-1.5">
+              <span>💾</span>
+              <span>Cadangkan & Pulihkan Data Turnamen (Backup / Restore)</span>
+            </div>
+            <p class="text-[11px] text-emerald-700 mt-0.5">
+              Simpan salinan daftar tim, bracket, & riwayat ke file <code class="font-bold">.json</code> sebagai cadangan aman.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              @click="exportTournamentBackup()"
+              class="px-3 py-1.5 rounded-lg bg-white hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 text-[11px] font-extrabold transition shadow-sm flex items-center gap-1"
+            >
+              <span>📥</span>
+              <span>Download Backup (.json)</span>
+            </button>
+            <button
+              type="button"
+              @click="triggerImportBackup()"
+              class="px-3 py-1.5 rounded-lg bg-white hover:bg-amber-600 text-amber-800 hover:text-white border border-amber-300 text-[11px] font-extrabold transition shadow-sm flex items-center gap-1"
+            >
+              <span>📂</span>
+              <span>Restore File (.json)</span>
+            </button>
+            <button
+              type="button"
+              @click="forcePushLocalToServer()"
+              title="Paksa unggah data di browser ini ke server terpusat"
+              class="px-3 py-1.5 rounded-lg bg-white hover:bg-indigo-600 text-indigo-800 hover:text-white border border-indigo-300 text-[11px] font-extrabold transition shadow-sm flex items-center gap-1"
+            >
+              <span>☁️</span>
+              <span>Upload ke Server</span>
+            </button>
+            <input
+              id="backup-json-file-input"
+              type="file"
+              accept=".json,application/json"
+              class="hidden"
+              @change="importTournamentBackupFile($event)"
+            />
+          </div>
+        </div>
+
         <!-- Form Tambah Tim Baru -->
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
           <div class="flex-1">
@@ -1284,6 +1345,26 @@
                             </button>
                           </div>
                         </div>
+
+                        <!-- Per-Set Score Breakdown & Duration Badge Inside Bracket Card (Opsi 4 & 5) -->
+                        <div
+                          x-show="(m.setDetails && m.setDetails.length > 0) || m.durationText"
+                          class="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px]"
+                        >
+                          <div class="flex flex-wrap items-center gap-1" x-show="m.setDetails && m.setDetails.length > 0">
+                            <template x-for="(sd, sIdx) in (m.setDetails || [])" :key="m.id + '-sd-' + sIdx">
+                              <span class="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-extrabold">
+                                S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
+                              </span>
+                            </template>
+                          </div>
+                          <span
+                            x-show="m.durationText"
+                            class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
+                          >
+                            ⏱️ <span x-text="m.durationText"></span>
+                          </span>
+                        </div>
                       </div>
 
                       <!-- ADMIN EDIT MODE -->
@@ -1410,6 +1491,26 @@
                           </div>
                         </div>
 
+                        <!-- Per-Set Score Breakdown & Duration Badge for 3rd Place Match -->
+                        <div
+                          x-show="(bracket.thirdPlaceMatch.setDetails && bracket.thirdPlaceMatch.setDetails.length > 0) || bracket.thirdPlaceMatch.durationText"
+                          class="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px]"
+                        >
+                          <div class="flex flex-wrap items-center gap-1" x-show="bracket.thirdPlaceMatch.setDetails && bracket.thirdPlaceMatch.setDetails.length > 0">
+                            <template x-for="(sd, sIdx) in (bracket.thirdPlaceMatch.setDetails || [])" :key="'tp-sd-' + sIdx">
+                              <span class="px-1.5 py-0.5 rounded bg-orange-50 border border-orange-200 text-orange-800 font-mono font-extrabold">
+                                S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
+                              </span>
+                            </template>
+                          </div>
+                          <span
+                            x-show="bracket.thirdPlaceMatch.durationText"
+                            class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
+                          >
+                            ⏱️ <span x-text="bracket.thirdPlaceMatch.durationText"></span>
+                          </span>
+                        </div>
+
                         <button
                           type="button"
                           x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye"
@@ -1427,6 +1528,91 @@
             </template>
           </div>
         </div>
+
+        <!-- STATISTIK & KLASEMEN PRODUKTIVITAS TIM (OPSI 5) -->
+        <div
+          x-show="tournamentStatsSummary.totalMatches > 0"
+          class="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 mt-4"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+            <div>
+              <h3 class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                <span>📊</span>
+                <span>Statistik Turnamen & Klasemen Produktivitas Tim</span>
+              </h3>
+              <p class="text-[11px] text-slate-500">
+                Rekap otomatis dari seluruh pertandingan yang telah selesai dimainkan
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-[11px]">
+              <span class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">
+                🏸 <strong class="text-emerald-700" x-text="tournamentStatsSummary.totalMatches"></strong> Laga
+              </span>
+              <span class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">
+                🔥 <strong class="text-indigo-700" x-text="tournamentStatsSummary.totalSets"></strong> Set
+              </span>
+              <span class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">
+                ⚡ <strong class="text-amber-700" x-text="tournamentStatsSummary.totalPoints"></strong> Total Poin
+              </span>
+              <span
+                x-show="tournamentStatsSummary.avgDurationText !== '-'"
+                class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-700"
+              >
+                ⏱️ Rata-rata: <strong class="text-slate-900 font-mono" x-text="tournamentStatsSummary.avgDurationText"></strong>
+              </span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-slate-200 text-[10px] sm:text-[11px] uppercase tracking-wider text-slate-500 font-extrabold">
+                  <th class="py-2 px-2">#</th>
+                  <th class="py-2 px-2">Nama Tim</th>
+                  <th class="py-2 px-2 text-center">Main</th>
+                  <th class="py-2 px-2 text-center">Menang - Kalah</th>
+                  <th class="py-2 px-2 text-center">Set (M-K)</th>
+                  <th class="py-2 px-2 text-center">Poin (M-K)</th>
+                  <th class="py-2 px-2 text-right">Selisih Poin</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200/70">
+                <template x-for="(row, rIdx) in tournamentStatsSummary.leaderboard" :key="'stat-' + row.name">
+                  <tr class="bg-white/80 hover:bg-white transition">
+                    <td class="py-2 px-2 font-black text-slate-500" x-text="rIdx + 1"></td>
+                    <td class="py-2 px-2 font-extrabold text-slate-900">
+                      <div class="flex items-center gap-1.5">
+                        <span x-show="rIdx === 0" class="text-amber-500">🥇</span>
+                        <span x-show="rIdx === 1" class="text-slate-400">🥈</span>
+                        <span x-show="rIdx === 2" class="text-orange-600">🥉</span>
+                        <span x-text="row.name"></span>
+                      </div>
+                    </td>
+                    <td class="py-2 px-2 text-center font-bold text-slate-700" x-text="row.played"></td>
+                    <td class="py-2 px-2 text-center font-extrabold">
+                      <span class="text-emerald-700" x-text="row.wins"></span>
+                      <span class="text-slate-400">-</span>
+                      <span class="text-rose-600" x-text="row.losses"></span>
+                    </td>
+                    <td class="py-2 px-2 text-center font-mono text-[11px] text-slate-700">
+                      <span x-text="row.setsWon + '-' + row.setsLost"></span>
+                    </td>
+                    <td class="py-2 px-2 text-center font-mono text-[11px] text-slate-700">
+                      <span x-text="row.pointsScored + '-' + row.pointsConceded"></span>
+                    </td>
+                    <td class="py-2 px-2 text-right font-mono font-extrabold">
+                      <span
+                        :class="row.pointDiff > 0 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : (row.pointDiff < 0 ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-slate-600 bg-slate-100 border-slate-200')"
+                        class="px-2 py-0.5 rounded border text-[11px]"
+                        x-text="(row.pointDiff > 0 ? '+' : '') + row.pointDiff"
+                      ></span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1442,6 +1628,10 @@
           <div class="flex items-center gap-1.5">
             <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold border border-emerald-200">
               SET <span x-text="match.currentSet"></span>/<span x-text="config.bestOf"></span>
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-mono font-extrabold border border-slate-200 flex items-center gap-1" title="Durasi Pertandingan Berjalan">
+              <span>⏱️</span>
+              <span x-text="matchElapsedFormatted"></span>
             </span>
             <span class="text-slate-500">
               Target: <strong class="text-slate-900" x-text="config.targetPoints"></strong>
@@ -1826,6 +2016,24 @@
 
       <!-- 3. UMPIRE SCORING CONTROLS (+1 POIN SIDE-BY-SIDE ON MOBILE & DESKTOP) -->
       <div class="space-y-2">
+        <!-- Spectator Mode Info Banner (Opsi 1: Shown when device has not unlocked Admin/Umpire Mode) -->
+        <div
+          x-show="!isAdminUnlocked"
+          class="bg-amber-50/90 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-xs"
+        >
+          <div class="flex items-center gap-2 text-amber-900 font-semibold min-w-0">
+            <span class="text-sm shrink-0">👀</span>
+            <span class="truncate">Anda dalam <strong>Mode Penonton (Live View)</strong>. Tombol wasit dikunci dengan password.</span>
+          </div>
+          <button
+            type="button"
+            @click="toggleAdminSession()"
+            class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-[11px] shrink-0 transition shadow-sm"
+          >
+            🔓 Mode Wasit
+          </button>
+        </div>
+
         <!-- Primary +1 Point Buttons (Always 2 columns side-by-side for fast thumb tapping!) -->
         <div class="grid grid-cols-2 md:grid-cols-12 gap-2.5 sm:gap-3">
           <!-- +1 Point Left Side Team -->
@@ -2042,11 +2250,19 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3" x-show="matchHistory.length > 0">
           <template x-for="item in matchHistory" :key="item.id">
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-4 space-y-2.5">
-              <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-slate-500">
+              <div class="flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-[11px] text-slate-500">
                 <span x-text="item.date"></span>
-                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 font-semibold">
-                  Target <span x-text="item.targetPoints"></span> (Maks <span x-text="item.maxCap"></span>)
-                </span>
+                <div class="flex items-center gap-1.5">
+                  <span
+                    x-show="item.durationText"
+                    class="px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 font-mono font-bold"
+                  >
+                    ⏱️ <span x-text="item.durationText"></span>
+                  </span>
+                  <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 font-semibold">
+                    Target <span x-text="item.targetPoints"></span> (Maks <span x-text="item.maxCap"></span>)
+                  </span>
+                </div>
               </div>
               <div class="flex items-center justify-between pt-1 gap-2">
                 <div class="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1 truncate">
@@ -2328,8 +2544,13 @@
       </div>
 
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-left">
-        <div class="text-xs font-bold text-slate-500 text-center">
-          Hasil Akhir Set (<span class="text-slate-900 font-black" x-text="match.setsWon.A + ' - ' + match.setsWon.B"></span>)
+        <div class="flex items-center justify-between text-xs font-bold text-slate-500">
+          <span>
+            Hasil Akhir Set (<span class="text-slate-900 font-black" x-text="match.setsWon.A + ' - ' + match.setsWon.B"></span>)
+          </span>
+          <span class="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-mono text-[11px]">
+            ⏱️ <span x-text="matchElapsedFormatted"></span>
+          </span>
         </div>
         <div class="space-y-1.5">
           <template x-for="s in match.setScoresHistory" :key="s.set">
@@ -2477,11 +2698,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=14"></script>
+  <script src="js/app.js?v=15"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=14').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=15').then((reg) => {
           reg.update();
         }).catch(() => {});
       });

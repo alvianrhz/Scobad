@@ -11,6 +11,7 @@ const STORAGE_KEY_ACTIVE = 'skor_badminton_active_v2';
 const STORAGE_KEY_HISTORY = 'skor_badminton_history_v2';
 const STORAGE_KEY_TEAMS = 'skor_badminton_master_teams_v1';
 const STORAGE_KEY_BRACKET = 'skor_badminton_bracket_v1';
+const STORAGE_KEY_ADMIN = 'skor_badminton_admin_unlocked_v1';
 
 const DEFAULT_MASTER_TEAMS = [
   {
@@ -62,6 +63,10 @@ function badmintonApp() {
 
     // Sound / Umpire TTS
     voiceEnabled: true,
+
+    // Admin / Umpire Session Lock (Spectator Mode vs Admin/Umpire Mode)
+    isAdminUnlocked: false,
+    matchStopwatchTimerId: null,
 
     // Centralized Server Sync State
     syncState: {
@@ -142,7 +147,9 @@ function badmintonApp() {
       pointLogs: [],
       intervalReachedInCurrentSet: false,
       rubberSwitchReached: false,
-      bracketMatchId: null
+      bracketMatchId: null,
+      startedAt: null,
+      elapsedSeconds: 0
     },
 
     // Undo Stack
@@ -190,11 +197,13 @@ function badmintonApp() {
 
     // Lifecycle Init
     async init() {
+      this.loadAdminSession();
       this.loadMasterTeams();
       this.loadBracket();
       this.loadHistory();
       this.loadActiveMatch();
       this.syncMaxCap();
+      this.startMatchStopwatch();
 
       // Connect to Centralized Server API (api.php) FIRST before any auto-selection saves
       await this.initialServerSync();
@@ -202,6 +211,43 @@ function badmintonApp() {
         this.ensureDistinctTeams();
       }
       this.startServerPolling();
+    },
+
+    // ==========================================
+    // STOPWATCH DURASI PERTANDINGAN (OPSI 4)
+    // ==========================================
+    startMatchStopwatch() {
+      if (this.matchStopwatchTimerId) {
+        clearInterval(this.matchStopwatchTimerId);
+      }
+      this.matchStopwatchTimerId = setInterval(() => {
+        if (this.match && this.match.isActive && !this.match.isFinished) {
+          if (this.match.startedAt) {
+            this.match.elapsedSeconds = Math.max(
+              0,
+              Math.floor((Date.now() - this.match.startedAt) / 1000)
+            );
+          } else {
+            this.match.elapsedSeconds = (this.match.elapsedSeconds || 0) + 1;
+          }
+        }
+      }, 1000);
+    },
+
+    formatDuration(totalSeconds) {
+      const sec = Math.max(0, parseInt(totalSeconds, 10) || 0);
+      const hrs = Math.floor(sec / 3600);
+      const mins = Math.floor((sec % 3600) / 60);
+      const remSec = sec % 60;
+      const pad = (n) => String(n).padStart(2, '0');
+      if (hrs > 0) {
+        return `${pad(hrs)}:${pad(mins)}:${pad(remSec)}`;
+      }
+      return `${pad(mins)}:${pad(remSec)}`;
+    },
+
+    get matchElapsedFormatted() {
+      return this.formatDuration(this.match.elapsedSeconds || 0);
     },
 
     isDefaultTeamsData(teamsList) {
@@ -535,9 +581,15 @@ function badmintonApp() {
       }
     },
 
-    createMasterTeam() {
+    createMasterTeam(bypassAuth = false) {
       const name = (this.newTeamNameInput || '').trim();
       if (!name) return;
+      if (!this.isAdminUnlocked && !bypassAuth) {
+        this.requestProtectedAction(`Tambah Tim Baru (${name})`, () => {
+          this.createMasterTeam(true);
+        });
+        return;
+      }
       const newId = 'team-' + Date.now();
       this.masterTeams.push({
         id: newId,
@@ -550,13 +602,48 @@ function badmintonApp() {
     },
 
     // ==========================================
-    // ADMIN PASSWORD PROTECTION ('solatlahdulu')
+    // ADMIN PASSWORD & SPECTATOR MODE ('solatlahdulu') (OPSI 1)
     // ==========================================
+    loadAdminSession() {
+      try {
+        this.isAdminUnlocked = localStorage.getItem(STORAGE_KEY_ADMIN) === 'true';
+      } catch (e) {
+        this.isAdminUnlocked = false;
+      }
+    },
+
+    toggleAdminSession() {
+      if (this.isAdminUnlocked) {
+        this.isAdminUnlocked = false;
+        try {
+          localStorage.removeItem(STORAGE_KEY_ADMIN);
+        } catch (e) {}
+        if (this.bracket && this.bracket.editMode) {
+          this.bracket.editMode = false;
+        }
+        return;
+      }
+      this.requestProtectedAction('Buka Kunci Mode Wasit / Admin', () => {
+        this.isAdminUnlocked = true;
+        try {
+          localStorage.setItem(STORAGE_KEY_ADMIN, 'true');
+        } catch (e) {}
+      });
+    },
+
+    requireAdminOrPrompt(actionTitle, callback) {
+      if (this.isAdminUnlocked) {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      this.requestProtectedAction(actionTitle, callback);
+    },
+
     requestProtectedAction(actionTitle, callback) {
       this._pendingProtectedCallback = callback;
       this.modals.passwordPrompt = {
         open: true,
-        actionTitle: actionTitle || 'Aksi Edit / Hapus Data',
+        actionTitle: actionTitle || 'Aksi Khusus Wasit / Admin',
         input: '',
         showPassword: false,
         error: ''
@@ -580,6 +667,12 @@ function badmintonApp() {
         this.modals.passwordPrompt.error = 'Password salah! Akses ditolak.';
         return;
       }
+      // Unlock Admin/Umpire session on this device
+      this.isAdminUnlocked = true;
+      try {
+        localStorage.setItem(STORAGE_KEY_ADMIN, 'true');
+      } catch (e) {}
+
       const fn = this._pendingProtectedCallback;
       this.closePasswordPrompt();
       if (typeof fn === 'function') {
@@ -711,7 +804,7 @@ function badmintonApp() {
       });
     },
 
-    addMemberToMasterTeam(teamId) {
+    addMemberToMasterTeam(teamId, bypassAuth = false) {
       if (!this.newMemberInputs[teamId]) {
         this.newMemberInputs[teamId] = { name: '', gender: 'male' };
       }
@@ -721,6 +814,13 @@ function badmintonApp() {
 
       const team = this.masterTeams.find((t) => t.id === teamId);
       if (!team) return;
+
+      if (!this.isAdminUnlocked && !bypassAuth) {
+        this.requestProtectedAction(`Tambah Anggota (${name} ke ${team.name})`, () => {
+          this.addMemberToMasterTeam(teamId, true);
+        });
+        return;
+      }
 
       const exists = team.members.some((m) => m.name.toLowerCase() === name.toLowerCase());
       if (!exists) {
@@ -1158,8 +1258,36 @@ function badmintonApp() {
     },
 
     // Set winner of a bracket match and propagate winner (and Semifinal loser to 3rd Place match)
-    advanceBracketMatchWinner(matchObj, winningTeamId, scoreA = null, scoreB = null, shouldSave = true) {
+    advanceBracketMatchWinner(
+      matchObj,
+      winningTeamId,
+      scoreA = null,
+      scoreB = null,
+      shouldSave = true,
+      extraDetails = null
+    ) {
       if (!matchObj || !matchObj.teamA || !matchObj.teamB) return;
+
+      // If called manually from the Bracket UI (where shouldSave === true and extraDetails === null)
+      // and the user has not unlocked Admin/Umpire mode yet, prompt for password first!
+      if (shouldSave && extraDetails === null && !this.isAdminUnlocked) {
+        const winName =
+          matchObj.teamA.id === winningTeamId ? matchObj.teamA.name : matchObj.teamB.name;
+        this.requestProtectedAction(
+          `Set Pemenang ${matchObj.label} (${winName})`,
+          () => {
+            this.advanceBracketMatchWinner(
+              matchObj,
+              winningTeamId,
+              scoreA,
+              scoreB,
+              shouldSave,
+              { manualByAdmin: true }
+            );
+          }
+        );
+        return;
+      }
 
       const winnerTeam =
         matchObj.teamA.id === winningTeamId ? matchObj.teamA : matchObj.teamB;
@@ -1169,6 +1297,17 @@ function badmintonApp() {
       matchObj.winnerId = winningTeamId;
       if (scoreA !== null) matchObj.scoreA = scoreA;
       if (scoreB !== null) matchObj.scoreB = scoreB;
+      if (extraDetails) {
+        if (Array.isArray(extraDetails.setDetails)) {
+          matchObj.setDetails = extraDetails.setDetails;
+        }
+        if (extraDetails.durationText) {
+          matchObj.durationText = extraDetails.durationText;
+        }
+        if (extraDetails.playersSummary) {
+          matchObj.playersSummary = extraDetails.playersSummary;
+        }
+      }
       if (matchObj.status !== 'BYE') {
         matchObj.status = 'FINISHED';
       }
@@ -1200,6 +1339,8 @@ function badmintonApp() {
           nextMatch.winnerId = null;
           nextMatch.scoreA = null;
           nextMatch.scoreB = null;
+          nextMatch.setDetails = [];
+          nextMatch.durationText = '';
           nextMatch.status = 'PENDING';
         }
       }
@@ -1240,9 +1381,19 @@ function badmintonApp() {
     },
 
     // Launch a Bracket Match into Setup/Court so Umpire can pick players and score it
-    playBracketMatch(matchObj) {
+    playBracketMatch(matchObj, bypassAuth = false) {
       if (!matchObj || !matchObj.teamA || !matchObj.teamB) return;
       if (matchObj.teamA.isBye || matchObj.teamB.isBye) return;
+
+      if (!this.isAdminUnlocked && !bypassAuth) {
+        this.requestProtectedAction(
+          `Mainkan ${matchObj.label} (${matchObj.teamA.name} vs ${matchObj.teamB.name})`,
+          () => {
+            this.playBracketMatch(matchObj, true);
+          }
+        );
+        return;
+      }
 
       this.bracket.activeBracketMatchId = matchObj.id;
       this.saveBracket();
@@ -1566,11 +1717,21 @@ function badmintonApp() {
     // ==========================================
     // MATCH START & SCORING ENGINE
     // ==========================================
-    startNewMatch() {
+    startNewMatch(bypassAuth = false) {
       if (this.isSameTeamSelected) {
         alert('Tim A dan Tim B tidak boleh menggunakan tim yang sama! Silakan pilih tim lawan yang berbeda.');
         return;
       }
+      if (!this.isAdminUnlocked && !bypassAuth) {
+        this.requestProtectedAction(
+          `Mulai Pertandingan (${this.getTeamName('A')} vs ${this.getTeamName('B')})`,
+          () => {
+            this.startNewMatch(true);
+          }
+        );
+        return;
+      }
+
       this.syncMaxCap();
       this.undoStack = [];
 
@@ -1614,7 +1775,9 @@ function badmintonApp() {
         pointLogs: [],
         intervalReachedInCurrentSet: false,
         rubberSwitchReached: false,
-        bracketMatchId: resolvedBracketMatchId
+        bracketMatchId: resolvedBracketMatchId,
+        startedAt: Date.now(),
+        elapsedSeconds: 0
       };
 
       const srv = this.currentServerPlayer;
@@ -1639,8 +1802,14 @@ function badmintonApp() {
       }
     },
 
-    undoLastAction() {
+    undoLastAction(bypassAuth = false) {
       if (this.undoStack.length === 0) return;
+      if (!this.isAdminUnlocked && !bypassAuth) {
+        this.requestProtectedAction('Undo Poin / Aksi Terakhir', () => {
+          this.undoLastAction(true);
+        });
+        return;
+      }
       const last = this.undoStack.pop();
       this.match = last.match;
       this.config = last.config;
@@ -1660,8 +1829,14 @@ function badmintonApp() {
       });
     },
 
-    addPoint(scoringTeam) {
+    addPoint(scoringTeam, bypassAuth = false) {
       if (this.match.isFinished || this.modals.setEnd.open) return;
+      if (!this.isAdminUnlocked && !bypassAuth) {
+        this.requestProtectedAction(`Tambah Poin (+1 ${this.getTeamName(scoringTeam)})`, () => {
+          this.addPoint(scoringTeam, true);
+        });
+        return;
+      }
 
       this.pushUndoSnapshot();
 
@@ -1908,12 +2083,32 @@ function badmintonApp() {
             winningTeamId = winnerTeam === 'A' ? bMatch.teamA.id : bMatch.teamB.id;
           }
 
+          // Build per-set score details in bMatch.teamA vs bMatch.teamB order (Opsi 5)
+          const setDetailsList = (this.match.setScoresHistory || []).map((s) => {
+            const ptsA = isNormalOrder ? s.A : s.B;
+            const ptsB = isNormalOrder ? s.B : s.A;
+            return `${ptsA}-${ptsB}`;
+          });
+
+          const lastSetObj =
+            this.match.setScoresHistory[this.match.setScoresHistory.length - 1];
+          const playersSummary = lastSetObj
+            ? isNormalOrder
+              ? `${lastSetObj.playersA} vs ${lastSetObj.playersB}`
+              : `${lastSetObj.playersB} vs ${lastSetObj.playersA}`
+            : '';
+
           this.advanceBracketMatchWinner(
             bMatch,
             winningTeamId,
             bScoreA,
             bScoreB,
-            false
+            false,
+            {
+              setDetails: setDetailsList,
+              durationText: this.matchElapsedFormatted,
+              playersSummary
+            }
           );
 
           this.modals.matchEnd.bracketUpdatedLabel = `${bMatch.label}: ${this.getTeamName(winnerTeam)} menang & melaju di Bracket!`;
@@ -1998,27 +2193,33 @@ function badmintonApp() {
     // UMPIRE MANUAL OVERRIDES (CORRECTIONS)
     // ==========================================
     swapTeamPlayersManual(teamKey) {
-      this.pushUndoSnapshot();
-      const right = this.match.positions[teamKey].rightBox;
-      const left = this.match.positions[teamKey].leftBox;
-      this.match.positions[teamKey].rightBox = left;
-      this.match.positions[teamKey].leftBox = right;
-      this.match.lastActionType = 'MANUAL_FIX';
-      this.triggerSwapAnimation(teamKey);
-      this.saveActiveMatch();
+      this.requireAdminOrPrompt('Tukar Posisi Pemain Manual', () => {
+        this.pushUndoSnapshot();
+        const right = this.match.positions[teamKey].rightBox;
+        const left = this.match.positions[teamKey].leftBox;
+        this.match.positions[teamKey].rightBox = left;
+        this.match.positions[teamKey].leftBox = right;
+        this.match.lastActionType = 'MANUAL_FIX';
+        this.triggerSwapAnimation(teamKey);
+        this.saveActiveMatch();
+      });
     },
 
     switchCourtSidesManual() {
-      this.pushUndoSnapshot();
-      this.match.teamAOnLeft = !this.match.teamAOnLeft;
-      this.match.lastActionType = 'SWITCH_SIDES';
-      this.saveActiveMatch();
+      this.requireAdminOrPrompt('Tukar Sisi Lapangan Kiri/Kanan', () => {
+        this.pushUndoSnapshot();
+        this.match.teamAOnLeft = !this.match.teamAOnLeft;
+        this.match.lastActionType = 'SWITCH_SIDES';
+        this.saveActiveMatch();
+      });
     },
 
     toggleServingTeamManual() {
-      this.pushUndoSnapshot();
-      this.match.servingTeam = this.match.servingTeam === 'A' ? 'B' : 'A';
-      this.saveActiveMatch();
+      this.requireAdminOrPrompt('Pindah Servis Manual', () => {
+        this.pushUndoSnapshot();
+        this.match.servingTeam = this.match.servingTeam === 'A' ? 'B' : 'A';
+        this.saveActiveMatch();
+      });
     },
 
     // ==========================================
@@ -2151,6 +2352,8 @@ function badmintonApp() {
             hour: '2-digit',
             minute: '2-digit'
           }),
+          durationSeconds: this.match.elapsedSeconds || 0,
+          durationText: this.matchElapsedFormatted,
           targetPoints: this.config.targetPoints,
           maxCap: this.config.maxCap,
           teamAName: this.getTeamName('A'),
@@ -2170,6 +2373,184 @@ function badmintonApp() {
       } catch (e) {
         console.warn('Failed to save history:', e);
       }
+    },
+
+    // ==========================================
+    // TOURNAMENT STATISTICS SUMMARY (OPSI 5)
+    // ==========================================
+    get tournamentStatsSummary() {
+      const history = Array.isArray(this.matchHistory) ? this.matchHistory : [];
+      let totalMatches = history.length;
+      let totalSets = 0;
+      let totalPoints = 0;
+      let totalDurationSec = 0;
+      let countWithDuration = 0;
+
+      const teamMap = {};
+      const ensureTeam = (name) => {
+        const clean = (name || 'Tim').trim();
+        if (!teamMap[clean]) {
+          teamMap[clean] = {
+            name: clean,
+            matchesPlayed: 0,
+            matchesWon: 0,
+            setsWon: 0,
+            setsLost: 0,
+            pointsScored: 0,
+            pointsConceded: 0
+          };
+        }
+        return teamMap[clean];
+      };
+
+      for (const item of history) {
+        const tA = ensureTeam(item.teamAName);
+        const tB = ensureTeam(item.teamBName);
+
+        tA.matchesPlayed += 1;
+        tB.matchesPlayed += 1;
+        if (item.winnerTeam === 'A') tA.matchesWon += 1;
+        if (item.winnerTeam === 'B') tB.matchesWon += 1;
+
+        tA.setsWon += item.setsWon?.A || 0;
+        tA.setsLost += item.setsWon?.B || 0;
+        tB.setsWon += item.setsWon?.B || 0;
+        tB.setsLost += item.setsWon?.A || 0;
+
+        if (item.durationSeconds && item.durationSeconds > 0) {
+          totalDurationSec += item.durationSeconds;
+          countWithDuration += 1;
+        }
+
+        for (const s of item.setScores || []) {
+          totalSets += 1;
+          const pA = parseInt(s.A, 10) || 0;
+          const pB = parseInt(s.B, 10) || 0;
+          totalPoints += pA + pB;
+          tA.pointsScored += pA;
+          tA.pointsConceded += pB;
+          tB.pointsScored += pB;
+          tB.pointsConceded += pA;
+        }
+      }
+
+      const leaderboard = Object.values(teamMap).sort((a, b) => {
+        if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon;
+        const setDiffA = a.setsWon - a.setsLost;
+        const setDiffB = b.setsWon - b.setsLost;
+        if (setDiffB !== setDiffA) return setDiffB - setDiffA;
+        return b.pointsScored - a.pointsScored;
+      });
+
+      const avgDurationSec =
+        countWithDuration > 0 ? Math.round(totalDurationSec / countWithDuration) : 0;
+
+      return {
+        totalMatches,
+        totalSets,
+        totalPoints,
+        avgDurationText: avgDurationSec > 0 ? this.formatDuration(avgDurationSec) : '--:--',
+        leaderboard
+      };
+    },
+
+    // ==========================================
+    // BACKUP & RESTORE DATA TURNAMEN (.JSON) (OPSI 6)
+    // ==========================================
+    exportTournamentBackup() {
+      try {
+        const backupData = {
+          appName: 'GF ScoBad',
+          version: '1.0',
+          exportedAt: new Date().toISOString(),
+          masterTeams: this.masterTeams,
+          bracket: this.bracket,
+          matchHistory: this.matchHistory,
+          config: this.config
+        };
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+          type: 'application/json'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `GF-ScoBad-Backup-${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Gagal membuat file backup: ' + e.message);
+      }
+    },
+
+    triggerImportBackup() {
+      this.requestProtectedAction('Restore / Import Data Backup (.json)', () => {
+        const fileInput = document.getElementById('backup-json-file-input');
+        if (fileInput) {
+          fileInput.value = '';
+          fileInput.click();
+        }
+      });
+    },
+
+    importTournamentBackupFile(event) {
+      const file = event?.target?.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed || typeof parsed !== 'object') {
+            throw new Error('Format file JSON tidak valid');
+          }
+
+          if (Array.isArray(parsed.masterTeams) && parsed.masterTeams.length > 0) {
+            this.masterTeams = parsed.masterTeams;
+            this.initMemberInputs();
+            localStorage.setItem(STORAGE_KEY_TEAMS, JSON.stringify(this.masterTeams));
+          }
+
+          if (parsed.bracket && typeof parsed.bracket === 'object') {
+            this.bracket = { ...this.bracket, ...parsed.bracket, editMode: false };
+            localStorage.setItem(STORAGE_KEY_BRACKET, JSON.stringify(this.bracket));
+          }
+
+          if (Array.isArray(parsed.matchHistory)) {
+            this.matchHistory = parsed.matchHistory;
+            localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(this.matchHistory));
+          }
+
+          this.ensureDistinctTeams();
+
+          await this.pushToServer({
+            masterTeams: this.masterTeams,
+            bracket: this.bracket,
+            matchHistory: this.matchHistory
+          });
+
+          alert('✅ Data Turnamen berhasil di-restore dan disinkronkan ke Server!');
+        } catch (err) {
+          alert('❌ Gagal membaca file backup: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    },
+
+    forcePushLocalToServer() {
+      this.requestProtectedAction('Upload Paksa Data Browser Ini ke Server', async () => {
+        await this.pushToServer({
+          masterTeams: this.masterTeams,
+          bracket: this.bracket,
+          matchHistory: this.matchHistory,
+          activeMatch: this.match.isActive
+            ? { config: this.config, match: this.match }
+            : null
+        });
+        alert('✅ Seluruh data di browser ini telah berhasil di-upload ke Server Terpusat!');
+      });
     },
 
     loadHistory() {
