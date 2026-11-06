@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="description" content="GF ScoBad — Aplikasi penghitung skor badminton ganda campuran lengkap dengan bracket turnamen dan panduan posisi servis resmi BWF." />
   <meta name="theme-color" content="#ffffff" />
-  <link rel="manifest" href="manifest.json?v=16" />
+  <link rel="manifest" href="manifest.json?v=17" />
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
 
   <!-- Google Fonts -->
@@ -32,7 +32,7 @@
   </script>
 
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/style.css?v=16" />
+  <link rel="stylesheet" href="css/style.css?v=17" />
 
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
@@ -280,16 +280,26 @@
 
           <!-- Preset Buttons -->
           <div class="space-y-1.5">
-            <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Pilih Preset Cepat:</label>
+            <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Pilih Preset Babak (Otomatis Saat Pilih Match):</label>
             <div class="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                @click="applyPreset('quick11')"
+                :class="config.preset === 'quick11' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
+                class="p-2 sm:p-2.5 rounded-xl border text-left transition"
+              >
+                <div class="font-extrabold text-[11px] sm:text-xs">Penyisihan 11</div>
+                <div class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">2-3 Set • @11 Poin</div>
+              </button>
+
               <button
                 type="button"
                 @click="applyPreset('community15')"
                 :class="config.preset === 'community15' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                 class="p-2 sm:p-2.5 rounded-xl border text-left transition"
               >
-                <div class="font-extrabold text-[11px] sm:text-xs">Komunitas 15</div>
-                <div class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">Maks 18 (+3)</div>
+                <div class="font-extrabold text-[11px] sm:text-xs">Semifinal 15</div>
+                <div class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">2-3 Set • @15 Poin</div>
               </button>
 
               <button
@@ -298,18 +308,8 @@
                 :class="config.preset === 'bwf21' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
                 class="p-2 sm:p-2.5 rounded-xl border text-left transition"
               >
-                <div class="font-extrabold text-[11px] sm:text-xs">Resmi BWF 21</div>
-                <div class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">Maks 30 (+9)</div>
-              </button>
-
-              <button
-                type="button"
-                @click="applyPreset('quick11')"
-                :class="config.preset === 'quick11' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-1 ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'"
-                class="p-2 sm:p-2.5 rounded-xl border text-left transition"
-              >
-                <div class="font-extrabold text-[11px] sm:text-xs">Cepat 11 Poin</div>
-                <div class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">Maks 14 (+3)</div>
+                <div class="font-extrabold text-[11px] sm:text-xs">Final 21 Poin</div>
+                <div class="text-[9px] sm:text-[10px] text-slate-500 mt-0.5">2-3 Set • @21 Poin</div>
               </button>
             </div>
           </div>
@@ -495,11 +495,42 @@
               </div>
 
               <!-- CASE 2: Bracket Created & Has Playable Unfinished Matches -->
-              <div x-show="bracket.isCreated && availableBracketMatches.length > 0" class="space-y-2.5">
+              <div x-show="bracket.isCreated" class="space-y-2.5">
+                <!-- Court Filter Pills (Semua / Lapangan 1 / Lapangan 2) -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                  <span class="text-[11px] font-bold text-slate-600">Filter Lapangan:</span>
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      @click="setupCourtFilter = 'ALL'; ensureDistinctTeams()"
+                      :class="setupCourtFilter === 'ALL' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition"
+                    >
+                      Semua
+                    </button>
+                    <button
+                      type="button"
+                      @click="setupCourtFilter = 'Lapangan 1'; ensureDistinctTeams()"
+                      :class="setupCourtFilter === 'Lapangan 1' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition"
+                    >
+                      🏟️ Lapangan 1
+                    </button>
+                    <button
+                      type="button"
+                      @click="setupCourtFilter = 'Lapangan 2'; ensureDistinctTeams()"
+                      :class="setupCourtFilter === 'Lapangan 2' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'"
+                      class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition"
+                    >
+                      🏟️ Lapangan 2
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Dropdown Selector for Quick Jump -->
-                <div>
+                <div x-show="availableBracketMatches.length > 0">
                   <label class="block text-[11px] font-bold text-slate-600 mb-1">
-                    Pilih Pertandingan (Otomatis Mengisi Tim A vs Tim B):
+                    Pilih Pertandingan (Otomatis Mengisi Tim & Target Poin Babak):
                   </label>
                   <select
                     :value="bracket.activeBracketMatchId || ''"
@@ -510,15 +541,15 @@
                       <option
                         :value="m.id"
                         :selected="bracket.activeBracketMatchId === m.id"
-                        x-text="'[' + m.label + ' • ' + m.roundName + ']  ' + m.teamA.name + '  VS  ' + m.teamB.name"
+                        x-text="'[' + m.court + ' • ' + m.time + ' • ' + (m.group ? 'Grup ' + m.group : m.label) + ' • @' + m.targetPoints + ' Poin]  ' + m.teamA.name + '  VS  ' + m.teamB.name"
                       ></option>
                     </template>
-                    <option value="MANUAL">-- Mode Manual (Pilih Pasangan Tim Bebas di Luar Bracket) --</option>
+                    <option value="MANUAL">-- Mode Manual (Pilih Pasangan Tim Bebas di Luar Jadwal) --</option>
                   </select>
                 </div>
 
                 <!-- Interactive Match Cards with Team vs Team Preview -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-0.5">
+                <div x-show="availableBracketMatches.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-0.5">
                   <template x-for="m in availableBracketMatches" :key="'card-' + m.id">
                     <button
                       type="button"
@@ -529,12 +560,15 @@
                       class="p-2.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5"
                     >
                       <div class="flex items-center justify-between gap-1 w-full">
-                        <span
-                          :class="bracket.activeBracketMatchId === m.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'"
-                          class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
-                          x-text="m.label"
-                        ></span>
-                        <span class="text-[10px] font-bold text-slate-400 truncate" x-text="m.roundName"></span>
+                        <div class="flex items-center gap-1">
+                          <span
+                            :class="bracket.activeBracketMatchId === m.id ? 'bg-emerald-600 text-white' : (m.group === 'B' ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800')"
+                            class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                            x-text="m.group ? 'Grup ' + m.group + ' (' + m.label + ')' : m.label"
+                          ></span>
+                          <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[9px] font-bold" x-text="'@' + m.targetPoints + ' Poin'"></span>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-500 truncate" x-text="m.court + ' • ' + m.time"></span>
                       </div>
                       <div class="flex items-center justify-between gap-1.5 text-xs font-extrabold text-slate-900 w-full">
                         <span class="truncate text-emerald-800" x-text="m.teamA.name"></span>
@@ -916,13 +950,32 @@
 
         <!-- Form Tambah Tim Baru -->
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+          <div class="w-full sm:w-32">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Pilih Grup:</label>
+            <select
+              x-model="newTeamGroupInput"
+              class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-extrabold text-slate-900 focus:border-emerald-600 focus:outline-none"
+            >
+              <option value="A">🅰️ Grup A</option>
+              <option value="B">🅱️ Grup B</option>
+            </select>
+          </div>
+          <div class="w-full sm:w-24">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kode Tim:</label>
+            <input
+              type="text"
+              x-model="newTeamCodeInput"
+              placeholder="A5 / B5"
+              class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 uppercase focus:border-emerald-600 focus:outline-none"
+            />
+          </div>
           <div class="flex-1">
             <label class="block text-xs font-bold text-slate-700 mb-1">Buat Nama Tim Baru:</label>
             <input
               type="text"
               x-model="newTeamNameInput"
               @keydown.enter.prevent="createMasterTeam()"
-              placeholder="Contoh: Tim 1 Alpha / PB Djarum..."
+              placeholder="Contoh: Tim A1 Alpha / Tim B1 Echo..."
               class="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
             />
           </div>
@@ -936,24 +989,39 @@
         </div>
 
         <!-- Daftar Semua Tim (Cards Grid) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           <template x-for="team in masterTeams" :key="team.id">
-            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-4">
+            <div
+              class="bg-white border-2 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-4"
+              :class="team.group === 'B' ? 'border-indigo-200/80' : 'border-emerald-200/80'"
+            >
               <div class="space-y-3">
                 <!-- Team Header: View Mode vs Edit Mode -->
                 <div class="border-b border-slate-100 pb-2.5">
                   <!-- View Mode -->
-                  <div x-show="editingTeamId !== team.id" class="flex items-center justify-between gap-2">
+                  <div x-show="editingTeamId !== team.id" class="flex items-start justify-between gap-2">
                     <div class="min-w-0 pr-1">
+                      <div class="flex items-center gap-1.5 mb-1">
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                          :class="team.group === 'B' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'"
+                          x-text="'Grup ' + (team.group || 'A') + (team.code ? ' • ' + team.code : '')"
+                        ></span>
+                        <span
+                          x-show="team.subtitle"
+                          class="text-[10px] text-slate-400 font-semibold italic truncate"
+                          x-text="'(' + team.subtitle + ')'"
+                        ></span>
+                      </div>
                       <h3 class="font-extrabold text-sm sm:text-base text-slate-900 truncate" x-text="team.name"></h3>
                       <span class="text-[11px] text-slate-500 font-medium" x-text="team.members.length + ' anggota terdaftar'"></span>
                     </div>
-                    <div class="flex items-center gap-1.5 shrink-0">
+                    <div class="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         @click="startEditMasterTeam(team)"
                         title="Edit Nama Tim"
-                        class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200 transition flex items-center gap-1"
+                        class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 transition flex items-center gap-1"
                       >
                         <span>✏️</span>
                         <span>Edit</span>
@@ -962,7 +1030,7 @@
                         type="button"
                         @click="deleteMasterTeam(team.id)"
                         title="Hapus Tim"
-                        class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold border border-rose-200 transition"
+                        class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-bold border border-rose-200 transition"
                       >
                         Hapus
                       </button>
@@ -971,6 +1039,27 @@
 
                   <!-- Inline Edit Team Name Mode -->
                   <div x-show="editingTeamId === team.id" class="space-y-2 bg-amber-50/60 border border-amber-200 rounded-xl p-2.5">
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-amber-800">Grup:</label>
+                        <select
+                          x-model="editingTeamGroup"
+                          class="w-full bg-white border border-amber-400 rounded-lg px-2 py-1 text-xs font-extrabold text-slate-900"
+                        >
+                          <option value="A">Grup A</option>
+                          <option value="B">Grup B</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-amber-800">Kode:</label>
+                        <input
+                          type="text"
+                          x-model="editingTeamCode"
+                          placeholder="A1/B1"
+                          class="w-full bg-white border border-amber-400 rounded-lg px-2 py-1 text-xs font-extrabold text-slate-900 uppercase"
+                        />
+                      </div>
+                    </div>
                     <label class="block text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
                       ✏️ Ubah Nama Tim:
                     </label>
@@ -1115,17 +1204,17 @@
     </section>
 
     <!-- ========================================== -->
-    <!-- SCREEN 2B: HALAMAN BRACKET TURNAMEN        -->
+    <!-- SCREEN 2B: HALAMAN BRACKET & KLASEMEN GRUP -->
     <!-- ========================================== -->
     <section x-show="screen === 'bracket'" x-transition.opacity class="space-y-4 sm:space-y-6">
-      <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-5">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
           <div>
             <h2 class="text-base sm:text-xl font-black text-slate-900 flex items-center gap-2">
-              <span>🏆</span> Bagan Bracket Turnamen (Juara 1, 2, & 3)
+              <span>🏆</span> Klasemen Grup, Jadwal Lapangan & Babak Gugur
             </h2>
             <p class="text-xs text-slate-500 mt-0.5">
-              Format otomatis untuk <strong class="text-emerald-700" x-text="masterTeams.length + ' tim terdaftar'"></strong>. Kalah sebelum 4 Besar langsung gugur; kalah di Semifinal bertanding di Perebutan Juara 3.
+              Sistem <strong class="text-emerald-700">Penyisihan Grup A & Grup B (12 Laga @11 Poin)</strong> → <strong class="text-indigo-700">Semifinal (@15 Poin)</strong> → <strong class="text-amber-700">Final (@21 Poin)</strong>. Menang = 2 Poin, Kalah = 0 Poin (Tie-breaker: Selisih Angka Kemenangan).
             </p>
           </div>
 
@@ -1137,23 +1226,24 @@
               :class="bracket.editMode ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'"
               class="px-3.5 py-2 font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
             >
-              <span x-text="bracket.editMode ? '✅ Selesai Atur Bracket' : '✏️ Atur Manual Tim & Urutan'"></span>
+              <span x-text="bracket.editMode ? '✅ Selesai Edit Jadwal/Skor' : '✏️ Edit Jadwal / Skor Set'"></span>
             </button>
             <div class="grid grid-cols-2 sm:flex gap-2">
               <button
                 type="button"
-                @click="generateBracket(true)"
-                class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1"
+                @click="forceAdvanceGroupToSemifinals()"
+                class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1"
+                title="Masukkan Juara & Runner-up Grup saat ini ke Semifinal"
               >
-                <span>🔀</span>
-                <span x-text="bracket.isCreated ? 'Acak Ulang' : 'Buat & Acak'"></span>
+                <span>⚡</span>
+                <span>Update Semifinal</span>
               </button>
               <button
                 type="button"
                 @click="generateBracket(false)"
-                class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition text-center"
+                class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition text-center"
               >
-                📋 Urut Daftar
+                🔄 Reset Jadwal Resmi
               </button>
             </div>
           </div>
@@ -1167,10 +1257,10 @@
         >
           <div class="space-y-0.5">
             <div class="font-extrabold flex items-center gap-1.5">
-              <span>🛠️</span> Mode Edit Manual Bracket Aktif (Khusus Admin)
+              <span>🛠️</span> Mode Edit Manual Jadwal & Skor Set Aktif (Password: ngajilahdulu)
             </div>
             <p class="text-[11px] text-amber-800">
-              Pilih tim di dropdown untuk menukar lawan, atau gunakan tombol <strong>↑ / ↓</strong> untuk memindahkan posisi Match.
+              Anda dapat menukar tim di tiap pertandingan atau mengisi <strong>Skor Rincian Set (contoh: 11-8, 11-9)</strong> agar Selisih Angka Kemenangan terhitung otomatis di klasemen!
             </p>
           </div>
           <button
@@ -1182,350 +1272,709 @@
           </button>
         </div>
 
-        <!-- PODIUM JUARA 1, 2, DAN 3 -->
+        <!-- PODIUM JUARA 1, 2, DAN 3 + HADIAH LOMBA -->
         <div
-          x-show="bracket.isCreated && (tournamentPodium.first || tournamentPodium.second || tournamentPodium.third)"
           class="bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 border border-amber-200 rounded-2xl p-3.5 sm:p-5"
         >
-          <div class="text-xs font-extrabold uppercase tracking-wider text-amber-800 text-center mb-3">
-            🎉 Klasemen Podium Pemenang Turnamen 🎉
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3">
+            <div class="text-xs font-extrabold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+              <span>🎉</span>
+              <span>Podium Pemenang & Hadiah Lomba</span>
+            </div>
+            <div class="text-[11px] font-bold text-slate-600">
+              18.30–18.45: Awarding & Foto Bersama • 18.45–19.00: Persiapan Pulang
+            </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-            <div class="bg-white border-2 border-amber-400 rounded-xl p-3 flex items-center gap-3 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-amber-100 text-xl flex items-center justify-center shrink-0">🥇</div>
-              <div class="min-w-0">
-                <div class="text-[10px] font-black uppercase tracking-wider text-amber-600">JUARA 1 (CHAMPION)</div>
-                <div class="font-black text-sm sm:text-base text-slate-900 truncate" x-text="tournamentPodium.first ? tournamentPodium.first.name : 'Menunggu Final...'"></div>
+            <div class="bg-white border-2 border-amber-400 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-xl flex items-center justify-center shrink-0">🥇</div>
+                <div class="min-w-0">
+                  <div class="text-[10px] font-black uppercase tracking-wider text-amber-600">JUARA 1 (CHAMPION)</div>
+                  <div class="font-black text-sm text-slate-900 truncate" x-text="tournamentPodium.first ? tournamentPodium.first.name : 'Menunggu Final...'"></div>
+                </div>
               </div>
+              <span class="px-2 py-1 rounded-lg bg-amber-100 text-amber-900 font-black text-xs shrink-0">Rp 400.000</span>
             </div>
 
-            <div class="bg-white border-2 border-slate-300 rounded-xl p-3 flex items-center gap-3 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-slate-100 text-xl flex items-center justify-center shrink-0">🥈</div>
-              <div class="min-w-0">
-                <div class="text-[10px] font-black uppercase tracking-wider text-slate-500">JUARA 2 (RUNNER-UP)</div>
-                <div class="font-black text-sm sm:text-base text-slate-900 truncate" x-text="tournamentPodium.second ? tournamentPodium.second.name : 'Menunggu Final...'"></div>
+            <div class="bg-white border-2 border-slate-300 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-xl flex items-center justify-center shrink-0">🥈</div>
+                <div class="min-w-0">
+                  <div class="text-[10px] font-black uppercase tracking-wider text-slate-500">JUARA 2 (RUNNER-UP)</div>
+                  <div class="font-black text-sm text-slate-900 truncate" x-text="tournamentPodium.second ? tournamentPodium.second.name : 'Menunggu Final...'"></div>
+                </div>
               </div>
+              <span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-800 font-black text-xs shrink-0">Rp 300.000</span>
             </div>
 
-            <div class="bg-white border-2 border-orange-300 rounded-xl p-3 flex items-center gap-3 shadow-sm">
-              <div class="w-10 h-10 rounded-xl bg-orange-100 text-xl flex items-center justify-center shrink-0">🥉</div>
-              <div class="min-w-0">
-                <div class="text-[10px] font-black uppercase tracking-wider text-orange-600">JUARA 3 (3RD PLACE)</div>
-                <div class="font-black text-sm sm:text-base text-slate-900 truncate" x-text="tournamentPodium.third ? tournamentPodium.third.name : 'Menunggu Playoff...'"></div>
+            <div class="bg-white border-2 border-orange-300 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-orange-100 text-xl flex items-center justify-center shrink-0">🥉</div>
+                <div class="min-w-0">
+                  <div class="text-[10px] font-black uppercase tracking-wider text-orange-600">JUARA 3 (3RD PLACE)</div>
+                  <div class="font-black text-sm text-slate-900 truncate" x-text="tournamentPodium.third ? tournamentPodium.third.name : 'Menunggu Playoff...'"></div>
+                </div>
               </div>
+              <span class="px-2 py-1 rounded-lg bg-orange-100 text-orange-900 font-black text-xs shrink-0">Rp 200.000</span>
             </div>
           </div>
         </div>
 
-        <!-- Empty State if Bracket Not Created Yet -->
-        <div x-show="!bracket.isCreated" class="py-10 px-4 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-          <div class="text-4xl">🏆</div>
-          <div class="font-extrabold text-slate-800 text-sm sm:text-base">Bracket Turnamen Belum Dibuat</div>
-          <p class="text-xs text-slate-500 max-w-md mx-auto">
-            Saat ini terdapat <strong class="text-slate-800" x-text="masterTeams.length + ' tim'"></strong> di menu Daftar Tim. Klik tombol <strong>"Buat & Acak"</strong> di atas untuk menyusun bagan pertandingan otomatis!
-          </p>
-        </div>
+        <!-- ===================================================== -->
+        <!-- 1. TABEL KLASEMEN BABAK PENYISIHAN GRUP A & GRUP B    -->
+        <!-- ===================================================== -->
+        <div x-show="bracket.isCreated && bracket.groupMatches && bracket.groupMatches.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- KLASEMEN GRUP A -->
+          <div class="bg-emerald-50/40 border-2 border-emerald-200 rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-black text-xs">GRUP A</span>
+                <h3 class="font-black text-xs sm:text-sm text-slate-900">Klasemen Penyisihan Grup A</h3>
+              </div>
+              <span
+                class="text-[10px] font-extrabold px-2 py-0.5 rounded-full"
+                :class="isGroupAllFinished('A') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-white text-slate-600 border border-slate-200'"
+                x-text="isGroupAllFinished('A') ? '✅ 6/6 Laga Selesai' : '⏳ 2 Teratas Lolos SF'"
+              ></span>
+            </div>
 
-        <!-- Mobile Swipe Hint -->
-        <div x-show="bracket.isCreated" class="md:hidden text-[11px] text-slate-500 font-semibold flex items-center justify-between bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-          <span>👈 Geser ke samping untuk melihat babak berikutnya 👉</span>
-        </div>
-
-        <!-- VISUAL BRACKET TREE (HORIZONTAL SCROLLABLE ROUNDS) -->
-        <div x-show="bracket.isCreated" class="overflow-x-auto pb-3 -mx-1 px-1">
-          <div class="flex items-stretch gap-3.5 sm:gap-5 min-w-max pt-1">
-            <!-- Loop through each Round -->
-            <template x-for="round in bracket.rounds" :key="round.roundIndex">
-              <div class="w-64 sm:w-72 flex flex-col">
-                <div
-                  class="px-3 py-2 rounded-xl font-extrabold text-[11px] sm:text-xs uppercase tracking-wider text-center mb-3 border"
-                  :class="round.isFinal ? 'bg-amber-50 border-amber-300 text-amber-900' : (round.isSemiFinal ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-100 border-slate-200 text-slate-700')"
-                  x-text="round.name"
-                ></div>
-
-                <div class="flex-1 flex flex-col justify-around gap-3.5">
-                  <template x-for="(m, mIdx) in round.matches" :key="m.id">
-                    <div
-                      class="bg-white border-2 rounded-2xl p-3 shadow-sm space-y-2 transition"
-                      :class="bracket.editMode ? 'border-amber-400 bg-amber-50/10' : (bracket.activeBracketMatchId === m.id ? 'border-emerald-500 ring-2 ring-emerald-500/20' : (m.winnerId ? 'border-slate-200' : 'border-slate-300'))"
-                    >
-                      <!-- Match Top Bar + Admin Order Controls -->
-                      <div class="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-500">
-                        <div class="flex items-center gap-1">
-                          <span class="text-slate-700 font-extrabold" x-text="m.label"></span>
-                          <span x-show="m.status === 'BYE'" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">BYE</span>
-                          <span x-show="m.status === 'FINISHED'" class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">SELESAI</span>
+            <div class="overflow-x-auto bg-white rounded-xl border border-emerald-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 font-extrabold">
+                    <th class="py-2 px-2">#</th>
+                    <th class="py-2 px-2">Tim (Grup A)</th>
+                    <th class="py-2 px-1.5 text-center" title="Main">Main</th>
+                    <th class="py-2 px-1.5 text-center" title="Menang - Kalah">M-K</th>
+                    <th class="py-2 px-1.5 text-center" title="Set Menang - Set Kalah">Set</th>
+                    <th class="py-2 px-1.5 text-center" title="Skor Angka Masuk - Kemasukan">Skor</th>
+                    <th class="py-2 px-1.5 text-center" title="Selisih Angka Kemenangan (Tie-Breaker Utama)">+/-</th>
+                    <th class="py-2 px-2 text-right" title="Poin Klasemen (Menang = 2, Kalah = 0)">Poin</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <template x-for="row in groupAStandings" :key="'standA-' + row.id">
+                    <tr :class="row.isQualified ? 'bg-emerald-50/50 font-bold' : 'bg-white'">
+                      <td class="py-2 px-2 font-black">
+                        <span
+                          class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px]"
+                          :class="row.rank === 1 ? 'bg-amber-400 text-slate-950' : (row.rank === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500')"
+                          x-text="row.rank"
+                        ></span>
+                      </td>
+                      <td class="py-2 px-2">
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-extrabold text-slate-900" x-text="row.name"></span>
+                          <span x-show="row.rank === 1" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-black">JUARA A</span>
+                          <span x-show="row.rank === 2" class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-black">RUNNER-UP</span>
                         </div>
-
-                        <!-- Admin Reorder Controls -->
-                        <div x-show="bracket.editMode && round.matches.length > 1" class="flex items-center gap-1">
-                          <select
-                            @change="moveBracketMatchOrder(round.roundIndex, mIdx, parseInt($event.target.value, 10)); $event.target.value = mIdx"
-                            class="bg-amber-50 border border-amber-300 text-amber-900 rounded px-1 py-0.5 text-[10px] font-extrabold focus:outline-none"
-                          >
-                            <template x-for="(otherM, oIdx) in round.matches" :key="otherM.id">
-                              <option :value="oIdx" :selected="oIdx === mIdx" x-text="oIdx === mIdx ? otherM.label : 'Ke ' + otherM.label"></option>
-                            </template>
-                          </select>
-                          <button
-                            type="button"
-                            :disabled="mIdx === 0"
-                            @click="moveBracketMatchOrder(round.roundIndex, mIdx, mIdx - 1)"
-                            class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-amber-200 disabled:opacity-30 text-slate-700 font-black"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            :disabled="mIdx === round.matches.length - 1"
-                            @click="moveBracketMatchOrder(round.roundIndex, mIdx, mIdx + 1)"
-                            class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-amber-200 disabled:opacity-30 text-slate-700 font-black"
-                          >
-                            ↓
-                          </button>
-                        </div>
-
-                        <span x-show="!bracket.editMode && round.roundIndex < bracket.rounds.length - 2 && m.status === 'FINISHED'" class="text-rose-500 font-semibold">Kalah=Gugur</span>
-                      </div>
-
-                      <!-- NORMAL VIEW MODE -->
-                      <div x-show="!bracket.editMode" class="space-y-1.5">
-                        <!-- Team A Slot -->
-                        <div
-                          class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
-                          :class="m.winnerId && m.teamA && m.winnerId === m.teamA.id
-                            ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
-                            : (m.winnerId && m.teamA && m.winnerId !== m.teamA.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
-                        >
-                          <div class="flex items-center gap-1.5 truncate pr-2">
-                            <span x-show="m.winnerId && m.teamA && m.winnerId === m.teamA.id" class="text-emerald-600">✔</span>
-                            <span class="truncate" x-text="m.teamA ? m.teamA.name : 'Menunggu Pemenang...'"></span>
-                          </div>
-                          <div class="flex items-center gap-1 shrink-0">
-                            <span
-                              x-show="m.scoreA !== null"
-                              class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
-                              x-text="m.scoreA"
-                            ></span>
-                            <button
-                              type="button"
-                              x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamA.id"
-                              @click="advanceBracketMatchWinner(m, m.teamA.id)"
-                              class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
-                            >
-                              Menang
-                            </button>
-                          </div>
-                        </div>
-
-                        <!-- Team B Slot -->
-                        <div
-                          class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
-                          :class="m.winnerId && m.teamB && m.winnerId === m.teamB.id
-                            ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
-                            : (m.winnerId && m.teamB && m.winnerId !== m.teamB.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
-                        >
-                          <div class="flex items-center gap-1.5 truncate pr-2">
-                            <span x-show="m.winnerId && m.teamB && m.winnerId === m.teamB.id" class="text-emerald-600">✔</span>
-                            <span class="truncate" x-text="m.teamB ? m.teamB.name : 'Menunggu Pemenang...'"></span>
-                          </div>
-                          <div class="flex items-center gap-1 shrink-0">
-                            <span
-                              x-show="m.scoreB !== null"
-                              class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
-                              x-text="m.scoreB"
-                            ></span>
-                            <button
-                              type="button"
-                              x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamB.id"
-                              @click="advanceBracketMatchWinner(m, m.teamB.id)"
-                              class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
-                            >
-                              Menang
-                            </button>
-                          </div>
-                        </div>
-
-                        <!-- Per-Set Score Breakdown & Duration Badge Inside Bracket Card (Opsi 4 & 5) -->
-                        <div
-                          x-show="(m.setDetails && m.setDetails.length > 0) || m.durationText"
-                          class="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px]"
-                        >
-                          <div class="flex flex-wrap items-center gap-1" x-show="m.setDetails && m.setDetails.length > 0">
-                            <template x-for="(sd, sIdx) in (m.setDetails || [])" :key="m.id + '-sd-' + sIdx">
-                              <span class="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-extrabold">
-                                S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
-                              </span>
-                            </template>
-                          </div>
-                          <span
-                            x-show="m.durationText"
-                            class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
-                          >
-                            ⏱️ <span x-text="m.durationText"></span>
-                          </span>
-                        </div>
-                      </div>
-
-                      <!-- ADMIN EDIT MODE -->
-                      <div x-show="bracket.editMode" class="space-y-2 bg-amber-50/50 p-2 rounded-xl border border-amber-200">
-                        <div>
-                          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Slot Tim 1:</label>
-                          <select
-                            :value="m.teamA ? m.teamA.id : ''"
-                            @change="changeBracketSlotTeam(round.roundIndex, mIdx, 'A', $event.target.value)"
-                            class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
-                          >
-                            <option value="">-- Kosong / Menunggu --</option>
-                            <template x-for="t in masterTeams" :key="'selA-' + m.id + '-' + t.id">
-                              <option :value="t.id" :selected="m.teamA && m.teamA.id === t.id" x-text="t.name"></option>
-                            </template>
-                            <option value="BYE" :selected="m.teamA && m.teamA.isBye">BYE (Lolos Langsung)</option>
-                          </select>
-                        </div>
-
-                        <div class="flex items-center justify-between px-1">
-                          <span class="text-[10px] font-black text-amber-700">VS</span>
-                          <button
-                            type="button"
-                            @click="swapTeamsInsideBracketMatch(round.roundIndex, mIdx)"
-                            class="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold transition"
-                          >
-                            ⇅ Tukar Atas/Bawah
-                          </button>
-                        </div>
-
-                        <div>
-                          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Slot Tim 2:</label>
-                          <select
-                            :value="m.teamB ? m.teamB.id : ''"
-                            @change="changeBracketSlotTeam(round.roundIndex, mIdx, 'B', $event.target.value)"
-                            class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
-                          >
-                            <option value="">-- Kosong / Menunggu --</option>
-                            <template x-for="t in masterTeams" :key="'selB-' + m.id + '-' + t.id">
-                              <option :value="t.id" :selected="m.teamB && m.teamB.id === t.id" x-text="t.name"></option>
-                            </template>
-                            <option value="BYE" :selected="m.teamB && m.teamB.isBye">BYE (Lolos Langsung)</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <!-- Action Button: Mainkan di Lapangan -->
-                      <button
-                        type="button"
-                        x-show="!bracket.editMode && m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye"
-                        @click="playBracketMatch(m)"
-                        class="w-full py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 text-[11px] font-extrabold transition flex items-center justify-center gap-1.5"
-                      >
-                        <span>🏸</span>
-                        <span x-text="m.winnerId ? 'Mainkan Ulang' : 'Mainkan Pertandingan Ini'"></span>
-                      </button>
-                    </div>
+                        <div x-show="row.alias" class="text-[10px] text-slate-400 font-medium" x-text="row.alias"></div>
+                      </td>
+                      <td class="py-2 px-1.5 text-center font-mono text-slate-700" x-text="row.played"></td>
+                      <td class="py-2 px-1.5 text-center font-mono">
+                        <span class="text-emerald-700 font-extrabold" x-text="row.wins"></span>-<span class="text-rose-600" x-text="row.losses"></span>
+                      </td>
+                      <td class="py-2 px-1.5 text-center font-mono text-[11px] text-slate-600" x-text="row.setsWon + '-' + row.setsLost"></td>
+                      <td class="py-2 px-1.5 text-center font-mono text-[11px] text-slate-600" x-text="row.pointsScored + '-' + row.pointsConceded"></td>
+                      <td class="py-2 px-1.5 text-center font-mono font-extrabold">
+                        <span
+                          :class="row.pointDiff > 0 ? 'text-emerald-700' : (row.pointDiff < 0 ? 'text-rose-600' : 'text-slate-500')"
+                          x-text="(row.pointDiff > 0 ? '+' : '') + row.pointDiff"
+                        ></span>
+                      </td>
+                      <td class="py-2 px-2 text-right font-mono font-black text-sm text-emerald-800" x-text="row.pts"></td>
+                    </tr>
                   </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-                  <!-- PEREBUTAN JUARA 3 IN FINAL COLUMN -->
-                  <template x-if="round.isFinal && bracket.thirdPlaceMatch">
-                    <div class="mt-3 pt-3 border-t-2 border-dashed border-slate-200">
-                      <div class="px-3 py-1.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-900 font-extrabold text-[11px] uppercase tracking-wider text-center mb-2">
-                        🥉 PEREBUTAN JUARA 3
+          <!-- KLASEMEN GRUP B -->
+          <div class="bg-indigo-50/40 border-2 border-indigo-200 rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-black text-xs">GRUP B</span>
+                <h3 class="font-black text-xs sm:text-sm text-slate-900">Klasemen Penyisihan Grup B</h3>
+              </div>
+              <span
+                class="text-[10px] font-extrabold px-2 py-0.5 rounded-full"
+                :class="isGroupAllFinished('B') ? 'bg-indigo-100 text-indigo-800 border border-indigo-300' : 'bg-white text-slate-600 border border-slate-200'"
+                x-text="isGroupAllFinished('B') ? '✅ 6/6 Laga Selesai' : '⏳ 2 Teratas Lolos SF'"
+              ></span>
+            </div>
+
+            <div class="overflow-x-auto bg-white rounded-xl border border-indigo-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 font-extrabold">
+                    <th class="py-2 px-2">#</th>
+                    <th class="py-2 px-2">Tim (Grup B)</th>
+                    <th class="py-2 px-1.5 text-center" title="Main">Main</th>
+                    <th class="py-2 px-1.5 text-center" title="Menang - Kalah">M-K</th>
+                    <th class="py-2 px-1.5 text-center" title="Set Menang - Set Kalah">Set</th>
+                    <th class="py-2 px-1.5 text-center" title="Skor Angka Masuk - Kemasukan">Skor</th>
+                    <th class="py-2 px-1.5 text-center" title="Selisih Angka Kemenangan (Tie-Breaker Utama)">+/-</th>
+                    <th class="py-2 px-2 text-right" title="Poin Klasemen (Menang = 2, Kalah = 0)">Poin</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <template x-for="row in groupBStandings" :key="'standB-' + row.id">
+                    <tr :class="row.isQualified ? 'bg-indigo-50/50 font-bold' : 'bg-white'">
+                      <td class="py-2 px-2 font-black">
+                        <span
+                          class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px]"
+                          :class="row.rank === 1 ? 'bg-amber-400 text-slate-950' : (row.rank === 2 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')"
+                          x-text="row.rank"
+                        ></span>
+                      </td>
+                      <td class="py-2 px-2">
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-extrabold text-slate-900" x-text="row.name"></span>
+                          <span x-show="row.rank === 1" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-black">JUARA B</span>
+                          <span x-show="row.rank === 2" class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-black">RUNNER-UP</span>
+                        </div>
+                        <div x-show="row.alias" class="text-[10px] text-slate-400 font-medium" x-text="row.alias"></div>
+                      </td>
+                      <td class="py-2 px-1.5 text-center font-mono text-slate-700" x-text="row.played"></td>
+                      <td class="py-2 px-1.5 text-center font-mono">
+                        <span class="text-emerald-700 font-extrabold" x-text="row.wins"></span>-<span class="text-rose-600" x-text="row.losses"></span>
+                      </td>
+                      <td class="py-2 px-1.5 text-center font-mono text-[11px] text-slate-600" x-text="row.setsWon + '-' + row.setsLost"></td>
+                      <td class="py-2 px-1.5 text-center font-mono text-[11px] text-slate-600" x-text="row.pointsScored + '-' + row.pointsConceded"></td>
+                      <td class="py-2 px-1.5 text-center font-mono font-extrabold">
+                        <span
+                          :class="row.pointDiff > 0 ? 'text-emerald-700' : (row.pointDiff < 0 ? 'text-rose-600' : 'text-slate-500')"
+                          x-text="(row.pointDiff > 0 ? '+' : '') + row.pointDiff"
+                        ></span>
+                      </td>
+                      <td class="py-2 px-2 text-right font-mono font-black text-sm text-indigo-800" x-text="row.pts"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================== -->
+        <!-- 2. JADWAL 12 LAGA PENYISIHAN GRUP (LAPANGAN 1 & 2)    -->
+        <!-- ===================================================== -->
+        <div x-show="bracket.isCreated && bracket.groupMatches && bracket.groupMatches.length > 0" class="space-y-3 pt-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                <span>📅</span>
+                <span>Jadwal & Hasil Babak Penyisihan Grup (2–3 Set @11 Poin Win)</span>
+              </h3>
+              <p class="text-[11px] text-slate-500">
+                Lapangan 1 (8 Laga: 15.00–17.00) & Lapangan 2 (4 Laga: 15.00–16.00). Klik <strong>Mainkan</strong> untuk memulai skor langsung!
+              </p>
+            </div>
+
+            <!-- Filter Lapangan / Grup -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                @click="bracketCourtFilter = 'ALL'"
+                :class="bracketCourtFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition"
+              >
+                Semua (12)
+              </button>
+              <button
+                type="button"
+                @click="bracketCourtFilter = 'Lapangan 1'"
+                :class="bracketCourtFilter === 'Lapangan 1' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'"
+                class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition"
+              >
+                🏟️ Lapangan 1 (8)
+              </button>
+              <button
+                type="button"
+                @click="bracketCourtFilter = 'Lapangan 2'"
+                :class="bracketCourtFilter === 'Lapangan 2' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'"
+                class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition"
+              >
+                🏟️ Lapangan 2 (4)
+              </button>
+              <button
+                type="button"
+                @click="bracketCourtFilter = 'Grup A'"
+                :class="bracketCourtFilter === 'Grup A' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition"
+              >
+                Grup A (6)
+              </button>
+              <button
+                type="button"
+                @click="bracketCourtFilter = 'Grup B'"
+                :class="bracketCourtFilter === 'Grup B' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition"
+              >
+                Grup B (6)
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <template x-for="gm in filteredGroupMatches" :key="gm.id">
+              <div
+                class="bg-white border-2 rounded-2xl p-3 shadow-sm space-y-2 transition flex flex-col justify-between"
+                :class="bracket.activeBracketMatchId === gm.id
+                  ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                  : (gm.winnerId ? 'border-slate-200 bg-slate-50/40' : 'border-slate-200 hover:border-slate-300')"
+              >
+                <div class="space-y-2">
+                  <!-- Top Header: Court, Time, Group Badge -->
+                  <div class="flex items-center justify-between gap-1 text-[10px] font-bold">
+                    <div class="flex items-center gap-1">
+                      <span
+                        class="px-2 py-0.5 rounded-md font-extrabold"
+                        :class="gm.court === 'Lapangan 1' ? 'bg-emerald-100 text-emerald-900' : 'bg-indigo-100 text-indigo-900'"
+                        x-text="gm.court"
+                      ></span>
+                      <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-extrabold" x-text="gm.time"></span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <span
+                        class="px-1.5 py-0.5 rounded font-black"
+                        :class="gm.group === 'A' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'"
+                        x-text="'Grup ' + gm.group"
+                      ></span>
+                      <span x-show="gm.winnerId" class="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-black">SELESAI</span>
+                    </div>
+                  </div>
+
+                  <!-- Teams Display (Normal Mode) -->
+                  <div x-show="!bracket.editMode" class="space-y-1.5">
+                    <!-- Team A -->
+                    <div
+                      class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
+                      :class="gm.winnerId && gm.teamA && gm.winnerId === gm.teamA.id
+                        ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
+                        : (gm.winnerId && gm.teamA && gm.winnerId !== gm.teamA.id ? 'bg-white border-slate-200 text-slate-400' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
+                    >
+                      <div class="flex items-center gap-1.5 truncate pr-2">
+                        <span x-show="gm.winnerId && gm.teamA && gm.winnerId === gm.teamA.id" class="text-emerald-600">✔</span>
+                        <span class="truncate" x-text="gm.teamA ? gm.teamA.name : 'Tim A'"></span>
                       </div>
-
-                      <div class="bg-white border-2 border-orange-200 rounded-2xl p-3 shadow-sm space-y-2">
-                        <div class="flex items-center justify-between text-[10px] font-bold text-orange-700">
-                          <span>Playoff Juara 3</span>
-                          <span x-show="bracket.thirdPlaceMatch.winnerId" class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800">SELESAI</span>
-                        </div>
-
-                        <div
-                          class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
-                          :class="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamA.id
-                            ? 'bg-orange-50 border-orange-400 font-extrabold text-orange-950'
-                            : 'bg-slate-50 border-slate-200 font-bold text-slate-800'"
-                        >
-                          <div class="flex items-center gap-1.5 truncate pr-2">
-                            <span x-show="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamA.id">🥉</span>
-                            <span class="truncate" x-text="bracket.thirdPlaceMatch.teamA ? bracket.thirdPlaceMatch.teamA.name : 'Kalah Semifinal 1...'"></span>
-                          </div>
-                          <div class="flex items-center gap-1 shrink-0">
-                            <span
-                              x-show="bracket.thirdPlaceMatch.scoreA !== null"
-                              class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
-                              x-text="bracket.thirdPlaceMatch.scoreA"
-                            ></span>
-                            <button
-                              type="button"
-                              x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye && bracket.thirdPlaceMatch.winnerId !== bracket.thirdPlaceMatch.teamA.id"
-                              @click="advanceBracketMatchWinner(bracket.thirdPlaceMatch, bracket.thirdPlaceMatch.teamA.id)"
-                              class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-orange-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
-                            >
-                              Menang
-                            </button>
-                          </div>
-                        </div>
-
-                        <div
-                          class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
-                          :class="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamB && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamB.id
-                            ? 'bg-orange-50 border-orange-400 font-extrabold text-orange-950'
-                            : 'bg-slate-50 border-slate-200 font-bold text-slate-800'"
-                        >
-                          <div class="flex items-center gap-1.5 truncate pr-2">
-                            <span x-show="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamB && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamB.id">🥉</span>
-                            <span class="truncate" x-text="bracket.thirdPlaceMatch.teamB ? bracket.thirdPlaceMatch.teamB.name : 'Kalah Semifinal 2...'"></span>
-                          </div>
-                          <div class="flex items-center gap-1 shrink-0">
-                            <span
-                              x-show="bracket.thirdPlaceMatch.scoreB !== null"
-                              class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
-                              x-text="bracket.thirdPlaceMatch.scoreB"
-                            ></span>
-                            <button
-                              type="button"
-                              x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye && bracket.thirdPlaceMatch.winnerId !== bracket.thirdPlaceMatch.teamB.id"
-                              @click="advanceBracketMatchWinner(bracket.thirdPlaceMatch, bracket.thirdPlaceMatch.teamB.id)"
-                              class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-orange-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
-                            >
-                              Menang
-                            </button>
-                          </div>
-                        </div>
-
-                        <!-- Per-Set Score Breakdown & Duration Badge for 3rd Place Match -->
-                        <div
-                          x-show="(bracket.thirdPlaceMatch.setDetails && bracket.thirdPlaceMatch.setDetails.length > 0) || bracket.thirdPlaceMatch.durationText"
-                          class="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px]"
-                        >
-                          <div class="flex flex-wrap items-center gap-1" x-show="bracket.thirdPlaceMatch.setDetails && bracket.thirdPlaceMatch.setDetails.length > 0">
-                            <template x-for="(sd, sIdx) in (bracket.thirdPlaceMatch.setDetails || [])" :key="'tp-sd-' + sIdx">
-                              <span class="px-1.5 py-0.5 rounded bg-orange-50 border border-orange-200 text-orange-800 font-mono font-extrabold">
-                                S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
-                              </span>
-                            </template>
-                          </div>
-                          <span
-                            x-show="bracket.thirdPlaceMatch.durationText"
-                            class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
-                          >
-                            ⏱️ <span x-text="bracket.thirdPlaceMatch.durationText"></span>
-                          </span>
-                        </div>
-
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span
+                          x-show="gm.scoreA !== null"
+                          class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                          x-text="gm.scoreA"
+                        ></span>
                         <button
                           type="button"
-                          x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye"
-                          @click="playBracketMatch(bracket.thirdPlaceMatch)"
-                          class="w-full py-1.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-600 text-orange-800 hover:text-white border border-orange-200 text-[11px] font-extrabold transition flex items-center justify-center gap-1.5"
+                          x-show="gm.teamA && gm.teamB && gm.winnerId !== gm.teamA.id"
+                          @click="advanceBracketMatchWinner(gm, gm.teamA.id)"
+                          class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
                         >
-                          <span>🏸</span>
-                          <span>Mainkan Perebutan Juara 3</span>
+                          Menang
                         </button>
                       </div>
                     </div>
-                  </template>
+
+                    <!-- Team B -->
+                    <div
+                      class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
+                      :class="gm.winnerId && gm.teamB && gm.winnerId === gm.teamB.id
+                        ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
+                        : (gm.winnerId && gm.teamB && gm.winnerId !== gm.teamB.id ? 'bg-white border-slate-200 text-slate-400' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
+                    >
+                      <div class="flex items-center gap-1.5 truncate pr-2">
+                        <span x-show="gm.winnerId && gm.teamB && gm.winnerId === gm.teamB.id" class="text-emerald-600">✔</span>
+                        <span class="truncate" x-text="gm.teamB ? gm.teamB.name : 'Tim B'"></span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <span
+                          x-show="gm.scoreB !== null"
+                          class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                          x-text="gm.scoreB"
+                        ></span>
+                        <button
+                          type="button"
+                          x-show="gm.teamA && gm.teamB && gm.winnerId !== gm.teamB.id"
+                          @click="advanceBracketMatchWinner(gm, gm.teamB.id)"
+                          class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                        >
+                          Menang
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Set Details & Duration -->
+                    <div
+                      x-show="(gm.setDetails && gm.setDetails.length > 0) || gm.durationText"
+                      class="pt-0.5 flex flex-wrap items-center justify-between gap-1 text-[10px]"
+                    >
+                      <div class="flex flex-wrap items-center gap-1" x-show="gm.setDetails && gm.setDetails.length > 0">
+                        <template x-for="(sd, sIdx) in (gm.setDetails || [])" :key="gm.id + '-gsd-' + sIdx">
+                          <span class="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-extrabold">
+                            S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
+                          </span>
+                        </template>
+                      </div>
+                      <span
+                        x-show="gm.durationText"
+                        class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
+                      >
+                        ⏱️ <span x-text="gm.durationText"></span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Admin Edit Mode for Group Match -->
+                  <div x-show="bracket.editMode" class="space-y-2 bg-amber-50/60 p-2 rounded-xl border border-amber-200 text-xs">
+                    <div class="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <label class="block text-[10px] font-bold text-slate-500">Tim 1:</label>
+                        <select
+                          :value="gm.teamA ? gm.teamA.id : ''"
+                          @change="changeGroupMatchSlotTeam(gm.id, 'A', $event.target.value)"
+                          class="w-full bg-white border border-slate-300 rounded-lg px-1.5 py-1 text-[11px] font-bold"
+                        >
+                          <template x-for="t in masterTeams" :key="'gmA-' + gm.id + '-' + t.id">
+                            <option :value="t.id" :selected="gm.teamA && gm.teamA.id === t.id" x-text="t.name"></option>
+                          </template>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-[10px] font-bold text-slate-500">Tim 2:</label>
+                        <select
+                          :value="gm.teamB ? gm.teamB.id : ''"
+                          @change="changeGroupMatchSlotTeam(gm.id, 'B', $event.target.value)"
+                          class="w-full bg-white border border-slate-300 rounded-lg px-1.5 py-1 text-[11px] font-bold"
+                        >
+                          <template x-for="t in masterTeams" :key="'gmB-' + gm.id + '-' + t.id">
+                            <option :value="t.id" :selected="gm.teamB && gm.teamB.id === t.id" x-text="t.name"></option>
+                          </template>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-amber-900 mb-0.5">
+                        Input Skor Set Manual (pisahkan koma, misal: 11-8, 11-7):
+                      </label>
+                      <input
+                        type="text"
+                        :value="(gm.setDetails || []).join(', ')"
+                        @change="updateMatchSetDetailsManual(gm, $event.target.value)"
+                        placeholder="Contoh: 11-8, 9-11, 11-6"
+                        class="w-full bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-900"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                <!-- Play Button -->
+                <button
+                  type="button"
+                  x-show="!bracket.editMode && gm.teamA && gm.teamB"
+                  @click="playBracketMatch(gm)"
+                  class="w-full py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 text-[11px] font-extrabold transition flex items-center justify-center gap-1.5"
+                >
+                  <span>🏸</span>
+                  <span x-text="gm.winnerId ? 'Mainkan Ulang (@11 Poin)' : 'Mainkan di ' + gm.court + ' (@11 Poin)'"></span>
+                </button>
               </div>
             </template>
+          </div>
+        </div>
+
+        <!-- ===================================================== -->
+        <!-- 3. BABAK GUGUR: SEMIFINAL (@15 POIN) & FINAL (@21 POIN)-->
+        <!-- ===================================================== -->
+        <div x-show="bracket.isCreated" class="pt-3 border-t border-slate-200 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                <span>🔥</span>
+                <span>Bagan Babak Gugur: Semifinal (17.00–18.00) & Final (18.00–18.30)</span>
+              </h3>
+              <p class="text-[11px] text-slate-500">
+                Semifinal 1 (Juara A vs Runner-Up B) & Semifinal 2 (Juara B vs Runner-Up A) di <strong>Lapangan 1</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto pb-3 -mx-1 px-1">
+            <div class="flex items-stretch gap-4 sm:gap-6 min-w-max pt-1">
+              <!-- Loop through each Knockout Round (Semifinal & Final) -->
+              <template x-for="round in bracket.rounds" :key="round.roundIndex">
+                <div class="w-72 sm:w-80 flex flex-col">
+                  <div
+                    class="px-3 py-2 rounded-xl font-extrabold text-[11px] sm:text-xs uppercase tracking-wider text-center mb-3 border"
+                    :class="round.isFinal ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-indigo-50 border-indigo-200 text-indigo-900'"
+                    x-text="round.name"
+                  ></div>
+
+                  <div class="flex-1 flex flex-col justify-around gap-3.5">
+                    <template x-for="(m, mIdx) in round.matches" :key="m.id">
+                      <div
+                        class="bg-white border-2 rounded-2xl p-3.5 shadow-sm space-y-2.5 transition"
+                        :class="bracket.editMode ? 'border-amber-400 bg-amber-50/10' : (bracket.activeBracketMatchId === m.id ? 'border-emerald-500 ring-2 ring-emerald-500/20' : (m.winnerId ? 'border-slate-200' : 'border-slate-300'))"
+                      >
+                        <!-- Match Top Bar -->
+                        <div class="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-500">
+                          <div class="flex items-center gap-1 flex-wrap">
+                            <span class="text-slate-800 font-black" x-text="m.label"></span>
+                            <span x-show="m.court" class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold" x-text="m.court"></span>
+                            <span x-show="m.time" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono" x-text="m.time"></span>
+                          </div>
+                          <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-extrabold" x-text="'@' + (m.targetPoints || (round.isFinal ? 21 : 15)) + ' Poin'"></span>
+                        </div>
+
+                        <!-- NORMAL VIEW MODE -->
+                        <div x-show="!bracket.editMode" class="space-y-1.5">
+                          <!-- Team A Slot -->
+                          <div
+                            class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
+                            :class="m.winnerId && m.teamA && m.winnerId === m.teamA.id
+                              ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
+                              : (m.winnerId && m.teamA && m.winnerId !== m.teamA.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
+                          >
+                            <div class="flex items-center gap-1.5 truncate pr-2">
+                              <span x-show="m.winnerId && m.teamA && m.winnerId === m.teamA.id" class="text-emerald-600">✔</span>
+                              <span class="truncate" x-text="m.teamA ? m.teamA.name : (m.slotALabel || 'Menunggu Pemenang...')"></span>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                              <span
+                                x-show="m.scoreA !== null"
+                                class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                                x-text="m.scoreA"
+                              ></span>
+                              <button
+                                type="button"
+                                x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamA.id"
+                                @click="advanceBracketMatchWinner(m, m.teamA.id)"
+                                class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                              >
+                                Menang
+                              </button>
+                            </div>
+                          </div>
+
+                          <!-- Team B Slot -->
+                          <div
+                            class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
+                            :class="m.winnerId && m.teamB && m.winnerId === m.teamB.id
+                              ? 'bg-emerald-50 border-emerald-400 font-extrabold text-emerald-950'
+                              : (m.winnerId && m.teamB && m.winnerId !== m.teamB.id ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-slate-50 border-slate-200 font-bold text-slate-800')"
+                          >
+                            <div class="flex items-center gap-1.5 truncate pr-2">
+                              <span x-show="m.winnerId && m.teamB && m.winnerId === m.teamB.id" class="text-emerald-600">✔</span>
+                              <span class="truncate" x-text="m.teamB ? m.teamB.name : (m.slotBLabel || 'Menunggu Pemenang...')"></span>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                              <span
+                                x-show="m.scoreB !== null"
+                                class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                                x-text="m.scoreB"
+                              ></span>
+                              <button
+                                type="button"
+                                x-show="m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye && m.winnerId !== m.teamB.id"
+                                @click="advanceBracketMatchWinner(m, m.teamB.id)"
+                                class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-emerald-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                              >
+                                Menang
+                              </button>
+                            </div>
+                          </div>
+
+                          <!-- Per-Set Score Breakdown & Duration Badge -->
+                          <div
+                            x-show="(m.setDetails && m.setDetails.length > 0) || m.durationText"
+                            class="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px]"
+                          >
+                            <div class="flex flex-wrap items-center gap-1" x-show="m.setDetails && m.setDetails.length > 0">
+                              <template x-for="(sd, sIdx) in (m.setDetails || [])" :key="m.id + '-sd-' + sIdx">
+                                <span class="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-extrabold">
+                                  S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
+                                </span>
+                              </template>
+                            </div>
+                            <span
+                              x-show="m.durationText"
+                              class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
+                            >
+                              ⏱️ <span x-text="m.durationText"></span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <!-- ADMIN EDIT MODE -->
+                        <div x-show="bracket.editMode" class="space-y-2 bg-amber-50/50 p-2 rounded-xl border border-amber-200">
+                          <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-0.5" x-text="m.slotALabel || 'Slot Tim 1:'"></label>
+                            <select
+                              :value="m.teamA ? m.teamA.id : ''"
+                              @change="changeBracketSlotTeam(round.roundIndex, mIdx, 'A', $event.target.value)"
+                              class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
+                            >
+                              <option value="">-- Menunggu Kualifikasi Grup --</option>
+                              <template x-for="t in masterTeams" :key="'selA-' + m.id + '-' + t.id">
+                                <option :value="t.id" :selected="m.teamA && m.teamA.id === t.id" x-text="t.name"></option>
+                              </template>
+                            </select>
+                          </div>
+
+                          <div class="flex items-center justify-between px-1">
+                            <span class="text-[10px] font-black text-amber-700">VS</span>
+                            <button
+                              type="button"
+                              @click="swapTeamsInsideBracketMatch(round.roundIndex, mIdx)"
+                              class="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold transition"
+                            >
+                              ⇅ Tukar Atas/Bawah
+                            </button>
+                          </div>
+
+                          <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-0.5" x-text="m.slotBLabel || 'Slot Tim 2:'"></label>
+                            <select
+                              :value="m.teamB ? m.teamB.id : ''"
+                              @change="changeBracketSlotTeam(round.roundIndex, mIdx, 'B', $event.target.value)"
+                              class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
+                            >
+                              <option value="">-- Menunggu Kualifikasi Grup --</option>
+                              <template x-for="t in masterTeams" :key="'selB-' + m.id + '-' + t.id">
+                                <option :value="t.id" :selected="m.teamB && m.teamB.id === t.id" x-text="t.name"></option>
+                              </template>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label class="block text-[10px] font-bold text-amber-900 mb-0.5">Skor Set Manual:</label>
+                            <input
+                              type="text"
+                              :value="(m.setDetails || []).join(', ')"
+                              @change="updateMatchSetDetailsManual(m, $event.target.value)"
+                              placeholder="Contoh: 15-12, 15-10"
+                              class="w-full bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-900"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Action Button: Mainkan di Lapangan -->
+                        <button
+                          type="button"
+                          x-show="!bracket.editMode && m.teamA && m.teamB && !m.teamA.isBye && !m.teamB.isBye"
+                          @click="playBracketMatch(m)"
+                          class="w-full py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 text-[11px] font-extrabold transition flex items-center justify-center gap-1.5"
+                        >
+                          <span>🏸</span>
+                          <span x-text="m.winnerId ? 'Mainkan Ulang' : 'Mainkan (' + (m.targetPoints || 15) + ' Poin)'"></span>
+                        </button>
+                      </div>
+                    </template>
+
+                    <!-- PEREBUTAN JUARA 3 IN FINAL COLUMN -->
+                    <template x-if="round.isFinal && bracket.thirdPlaceMatch">
+                      <div class="mt-3 pt-3 border-t-2 border-dashed border-slate-200">
+                        <div class="px-3 py-1.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-900 font-extrabold text-[11px] uppercase tracking-wider text-center mb-2">
+                          🥉 PEREBUTAN JUARA 3
+                        </div>
+
+                        <div class="bg-white border-2 border-orange-200 rounded-2xl p-3 shadow-sm space-y-2">
+                          <div class="flex items-center justify-between text-[10px] font-bold text-orange-700">
+                            <span>Playoff Juara 3</span>
+                            <span x-show="bracket.thirdPlaceMatch.winnerId" class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800">SELESAI</span>
+                          </div>
+
+                          <div
+                            class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
+                            :class="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamA.id
+                              ? 'bg-orange-50 border-orange-400 font-extrabold text-orange-950'
+                              : 'bg-slate-50 border-slate-200 font-bold text-slate-800'"
+                          >
+                            <div class="flex items-center gap-1.5 truncate pr-2">
+                              <span x-show="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamA.id">🥉</span>
+                              <span class="truncate" x-text="bracket.thirdPlaceMatch.teamA ? bracket.thirdPlaceMatch.teamA.name : 'Kalah Semifinal 1...'"></span>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                              <span
+                                x-show="bracket.thirdPlaceMatch.scoreA !== null"
+                                class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                                x-text="bracket.thirdPlaceMatch.scoreA"
+                              ></span>
+                              <button
+                                type="button"
+                                x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye && bracket.thirdPlaceMatch.winnerId !== bracket.thirdPlaceMatch.teamA.id"
+                                @click="advanceBracketMatchWinner(bracket.thirdPlaceMatch, bracket.thirdPlaceMatch.teamA.id)"
+                                class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-orange-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                              >
+                                Menang
+                              </button>
+                            </div>
+                          </div>
+
+                          <div
+                            class="flex items-center justify-between px-2.5 py-2 rounded-xl border text-xs transition"
+                            :class="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamB && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamB.id
+                              ? 'bg-orange-50 border-orange-400 font-extrabold text-orange-950'
+                              : 'bg-slate-50 border-slate-200 font-bold text-slate-800'"
+                          >
+                            <div class="flex items-center gap-1.5 truncate pr-2">
+                              <span x-show="bracket.thirdPlaceMatch.winnerId && bracket.thirdPlaceMatch.teamB && bracket.thirdPlaceMatch.winnerId === bracket.thirdPlaceMatch.teamB.id">🥉</span>
+                              <span class="truncate" x-text="bracket.thirdPlaceMatch.teamB ? bracket.thirdPlaceMatch.teamB.name : 'Kalah Semifinal 2...'"></span>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                              <span
+                                x-show="bracket.thirdPlaceMatch.scoreB !== null"
+                                class="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-xs font-black"
+                                x-text="bracket.thirdPlaceMatch.scoreB"
+                              ></span>
+                              <button
+                                type="button"
+                                x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye && bracket.thirdPlaceMatch.winnerId !== bracket.thirdPlaceMatch.teamB.id"
+                                @click="advanceBracketMatchWinner(bracket.thirdPlaceMatch, bracket.thirdPlaceMatch.teamB.id)"
+                                class="text-[10px] px-1.5 py-0.5 rounded bg-white hover:bg-orange-600 hover:text-white text-slate-500 border border-slate-300 transition font-bold"
+                              >
+                                Menang
+                              </button>
+                            </div>
+                          </div>
+
+                          <!-- Per-Set Score Breakdown & Duration Badge for 3rd Place Match -->
+                          <div
+                            x-show="(bracket.thirdPlaceMatch.setDetails && bracket.thirdPlaceMatch.setDetails.length > 0) || bracket.thirdPlaceMatch.durationText"
+                            class="pt-1 flex flex-wrap items-center justify-between gap-1 text-[10px]"
+                          >
+                            <div class="flex flex-wrap items-center gap-1" x-show="bracket.thirdPlaceMatch.setDetails && bracket.thirdPlaceMatch.setDetails.length > 0">
+                              <template x-for="(sd, sIdx) in (bracket.thirdPlaceMatch.setDetails || [])" :key="'tp-sd-' + sIdx">
+                                <span class="px-1.5 py-0.5 rounded bg-orange-50 border border-orange-200 text-orange-800 font-mono font-extrabold">
+                                  S<span x-text="sIdx + 1"></span>: <span x-text="sd"></span>
+                                </span>
+                              </template>
+                            </div>
+                            <span
+                              x-show="bracket.thirdPlaceMatch.durationText"
+                              class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono font-bold ml-auto"
+                            >
+                              ⏱️ <span x-text="bracket.thirdPlaceMatch.durationText"></span>
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            x-show="bracket.thirdPlaceMatch.teamA && bracket.thirdPlaceMatch.teamB && !bracket.thirdPlaceMatch.teamA.isBye && !bracket.thirdPlaceMatch.teamB.isBye"
+                            @click="playBracketMatch(bracket.thirdPlaceMatch)"
+                            class="w-full py-1.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-600 text-orange-800 hover:text-white border border-orange-200 text-[11px] font-extrabold transition flex items-center justify-center gap-1.5"
+                          >
+                            <span>🏸</span>
+                            <span>Mainkan Perebutan Juara 3</span>
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
 
@@ -1538,7 +1987,7 @@
             <div>
               <h3 class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
                 <span>📊</span>
-                <span>Statistik Turnamen & Klasemen Produktivitas Tim</span>
+                <span>Statistik Keseluruhan Turnamen (Grup + Babak Gugur)</span>
               </h3>
               <p class="text-[11px] text-slate-500">
                 Rekap otomatis dari seluruh pertandingan yang telah selesai dimainkan
@@ -2714,11 +3163,11 @@
   </div>
 
   <!-- App Logic Script -->
-  <script src="js/app.js?v=16"></script>
+  <script src="js/app.js?v=17"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=16').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=17').then((reg) => {
           reg.update();
         }).catch(() => {});
       });
